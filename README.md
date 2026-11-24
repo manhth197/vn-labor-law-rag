@@ -4,7 +4,7 @@ Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Ngh�
 
 > Work in progress: milestones M1 (corpus and parsing) and M2 (index and retrieval) are done. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
 
-**Not legal advice.** The corpus is the original text of Bộ luật Lao động số 45/2019/QH14 (passed 20/11/2019) and Nghị định số 145/2020/NĐ-CP (signed 14/12/2020), as published in the Official Gazette. Later amendments are **not** reflected yet (see [Future work](#future-work)).
+**Not legal advice.** The corpus is the original text of Bộ luật Lao động số 45/2019/QH14 (passed 20/11/2019) and Nghị định số 145/2020/NĐ-CP (signed 14/12/2020), as published in the Official Gazette. Later amendments are **not** reflected yet (see [Future work](#future-work): one clause is already in force, a larger amending law takes effect on 01/03/2027).
 
 ## Corpus
 
@@ -92,7 +92,11 @@ pytest tests/test_eval.py                                  # re-checks evidence 
 
 ## Future work
 
-- Use consolidated texts so amendments are reflected: the Labor Code has a consolidated text, 125/VBHN-VPQH (27/08/2025, [Công báo 1309+1310](https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm)). For Nghị định 145, a draft amending decree was published for comment in July 2026; check whether it has been issued.
+Known amendments not yet in the corpus (checked 2026-11-24 on official sources):
+
+- **Bộ luật Lao động, in force since 01/01/2026:** clause 8a added to Điều 154 (high-quality digital technology workforce exempt from work permits) by khoản 4 Điều 49 of Luật Công nghiệp công nghệ số 71/2025/QH15. It is the only change in the consolidated text 125/VBHN-VPQH (27/08/2025, [Công báo 1309+1310](https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm)); an article-by-article comparison found no other substantive difference.
+- **Bộ luật Lao động, from 01/03/2027:** the law amending the Labor Code and four other laws, passed on 21/11/2026 ([Báo Chính phủ](https://baochinhphu.vn/quoc-hoi-dong-y-bo-sung-2-ngay-nghi-le-duoc-huong-nguyen-luong-102261121121448218.htm)): labor leasing moves from a license to deposit + notification, two new paid public holidays (27/7 and 24/11), and changes to collective bargaining, the National Wage Council, labor management and strikes. Article list to be added when the text is published in Công báo.
+- **Nghị định 145/2020:** a draft amending decree was published for comment in July 2026 (labor leasing, Phụ lục II); not issued as far as we found.
 
 ## License
 
