@@ -50,7 +50,7 @@ ruff check . && ruff format --check .
 - `index` downloads bge-m3 once (about 2.3 GB). The model revision is pinned (`EMBEDDING_REVISION`, the Hub's safetensors conversion of the same weights), so only one weight file is cached and offline runs work. Embedding all 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/` by the hash of each chunk's text, so after a corpus update only changed chunks are embedded again (5 chunks, 9.6 s, for the switch to the consolidated text).
 - Use `127.0.0.1` rather than `localhost` in `DATABASE_URL` on Windows: `localhost` tries IPv6 first and the container port is bound to IPv4 only, which costs a connection timeout.
 - Configuration is read from environment variables or `.env` (see `.env.example`).
-- **LLM:** Google Gemini API, free tier, official `google-genai` SDK. Model `gemini-4-hydrogen` (strongest model marked free of charge on 2026-11-24), fallback `gemini-3.8-flash`; change with `LLM_MODEL` / `LLM_FALLBACK_MODEL`. **On the free tier Google may use the requests to improve its products**: the app sends only the question and public legal text; do not type personal data into questions.
+- **LLM:** Google Gemini API, free tier, official `google-genai` SDK. Model `gemini-3.5-flash-lite`, fallback `gemini-3.8-flash`, chosen by measured success rate and latency on 2026-11-24 ([decision 008](docs/decisions/008-llm-latency-policy-and-streaming.md)); change with `LLM_MODEL` / `LLM_FALLBACK_MODEL`. **On the free tier Google may use the requests to improve its products**: the app sends only the question and public legal text; do not type personal data into questions.
 
 ## Retrieval results
 
@@ -96,7 +96,15 @@ LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found)
 | `GET /api/articles/{doc}/{n}` | One article: structure, text, amendment notes |
 | `GET /health` | Status, model, index size, corpus notice |
 
-Latency policy: each Gemini call has a hard 25 s limit; a timeout, 503 or 429 switches to the fallback model at once; the whole answer has a 60 s budget, after which the UI shows a Vietnamese error message. Model latency is measured with `python -m vnlaw_rag.cli bench-llm` (does not load the embedding model); a first attempt on 2026-11-24 met only 503s and timeouts and was cut short by low memory, so no p50/p95 yet ([decision 008](docs/decisions/008-llm-latency-policy-and-streaming.md)).
+Latency policy: each Gemini call has a hard 25 s limit; a timeout, 503, 429 or stream error switches to the other model at once (main, fallback, main); the whole answer has a 60 s budget, then the UI shows a Vietnamese error message.
+
+Model choice, measured with `python -m vnlaw_rag.cli bench-llm` (5 reviewed questions per model, 2026-11-24): gemini-3.5-flash-lite answered 4/5 (p50 1.7 s, p95 2.0 s); gemini-4-hydrogen and gemini-3.8-flash answered 0/5 within 25 s. Details and fallback checks: [decision 008](docs/decisions/008-llm-latency-policy-and-streaming.md).
+
+| Answer with citation | Holiday question with the 01/03/2027 warning | Out of scope |
+|---|---|---|
+| ![answer](docs/screenshots/1-answer.png) | ![holiday](docs/screenshots/2-holiday-warning.png) | ![out of scope](docs/screenshots/3-out-of-scope.png) |
+
+Screenshots taken in Microsoft Edge with `scripts/screenshots.py` (Playwright, system browser, no download) against a local server; answers took 2.3 s, 1.4 s and 0.1 s.
 
 ## Data layout
 

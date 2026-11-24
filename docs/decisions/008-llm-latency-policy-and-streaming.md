@@ -1,24 +1,30 @@
-# 008. LLM latency policy and streaming answers
+# 008. LLM latency policy, streaming answers and the measured model choice
 
-Date: 2026-11-24 · Status: policy accepted; default model choice pending a clean measurement
+Date: 2026-11-24 · Status: accepted (coordinator) · Updates the model choice of 007
 
 ## Context
-In the M3 smoke test an answer took 3 to 160 s; most of the 160 s were three 503 responses from gemini-4-hydrogen with backoff in between. A demo UI cannot sit silent that long. The coordinator asked for a per-call timeout, an immediate switch to the fallback model, a total time budget with a friendly error, progress events and token streaming, and a model choice based on measured reliability and speed.
+In the M3 smoke test an answer took 3 to 160 s, mostly three 503s from gemini-4-hydrogen plus backoff. A demo UI cannot sit silent that long. Requirements: a per-call timeout, an immediate switch to another model, a total budget with a friendly error, progress events and token streaming, and a model chosen by success rate first, then p50/p95, then quality.
 
 ## Decision
-- **Hard per-call limit (25 s):** each call runs in a daemon thread and the caller waits at most 25 s. A first version closed the stream from a timer, but the benchmark showed a 25 s call lasting 71 s (closing does not always interrupt a blocked socket read), so the wait itself is bounded now. Late tokens of an abandoned call are dropped.
-- **Immediate fallback:** a timeout, 5xx or 429 switches to the next model at once; only repeated failures on the last model back off (2 s, 4 s). **Budget 60 s** per answer, then `Unavailable`/`RateLimited`, shown as a Vietnamese message. Eval uses the main model only with a 180 s budget.
-- **Streaming:** `GET /api/ask/stream` sends SSE `progress` events from the graph nodes (searching, found N articles, generating, switching model), `token` events with the growing `answer` field decoded from the partial JSON of the Interactions stream, then `result` (validated citations, warnings, model, timings) or `error`. The UI shows progress, the streamed text, then the final answer with citation cards, warnings, model and time.
+- **Hard 25 s per call:** the call runs in a daemon thread and the caller waits at most 25 s (closing the stream from a timer was not enough: a 25 s call once lasted 71 s). Late tokens of an abandoned call are dropped.
+- **Models take turns without waiting:** a timeout, 5xx, 429 or mid-stream error event switches at once to the other model (main, fallback, main); one model alone backs off 2 s, 4 s. **60 s budget** per answer, then a Vietnamese error. Eval uses one model with a 180 s budget.
+- **Streaming:** SSE `progress` (searching, found N articles, generating, switching model), `token` (the `answer` field decoded from the partial JSON), then `result` or `error`.
+- **Model:** `LLM_MODEL=gemini-3.5-flash-lite`, `LLM_FALLBACK_MODEL=gemini-3.8-flash`, from the measurement below. gemini-4-hydrogen is not the default: it never answered within 25 s.
 
-## Measurements so far (not enough to choose)
-| When (2026-11-24) | Model | Calls | OK | Failures | Notes |
+## Measurement (2026-11-24 06:53 UTC, git c51d5c4, `bench-llm`)
+5 reviewed questions per model, one streaming attempt each, 25 s limit, 4 s pause, sequential:
+
+| Model | OK | Failures | TTFT p50 | Total p50 | Total p95 |
 |---|---|---|---|---|---|
-| M3 smoke, ~12:10 | gemini-4-hydrogen | 6 attempts | 3 | 3 × 503 | successes took 3.4 to 48 s |
-| benchmark, ~13:05 | gemini-4-hydrogen | 3 | 0 | 3 × 503 (31-37 s) | run stopped early |
-| benchmark, ~13:05 | gemini-3.8-flash | 3 | 0 | 1 × 503, 2 × timeout (72 s) | timeouts exposed the watchdog flaw |
+| gemini-3.5-flash-lite | 4/5 | 1 mid-stream error event (1.4 s) | 0.98 s | 1.68 s | 2.0 s |
+| gemini-4-hydrogen | 0/5 | 5 timeouts | - | - | - |
+| gemini-3.8-flash | 0/5 | 5 timeouts | - | - | - |
+| gemini-3.1-flash-lite (fallback check, 3 q.) | 0/3 | 1 error event, 2 timeouts | - | - | - |
+| gemini-2.5-flash-lite (fallback check, 3 q.) | 0/3 | 404: not served by the Interactions API | - | - | - |
 
-The benchmark was stopped by Claude Code because the machine ran critically low on memory (it loaded bge-m3 while other services ran), so its timings are not trustworthy; the 503s come from Google's side. **No p50/p95 yet.** The benchmark no longer loads the embedding model (prompts are rebuilt from the recorded vector ranking), so it can be re-run with little RAM: `python -m vnlaw_rag.cli bench-llm` (10 requests). Until then the default stays gemini-4-hydrogen with gemini-3.8-flash as fallback; adding `gemini-3.5-flash-lite` (stable, positioned as the fastest) to the comparison is suggested.
+Earlier that day gemini-4-hydrogen also returned 3 x 503 in the smoke test and 3 x 503 in a benchmark cut short by low memory. With 5 questions per model, p95 is the maximum. Raw samples: `data/eval/llm_latency.json`, `data/eval/llm_latency_fallback.json`.
 
 ## Consequences
-- Worst case an answer ends after about 60 s with a clear message instead of hanging; with the free tier's 503s the fallback path is the normal path at busy times.
-- The model choice will be revisited with numbers; the decision is one config value (`LLM_MODEL`, `LLM_FALLBACK_MODEL`).
+- In the browser test (Edge, 3 questions) answers took 2.3 s and 1.4 s; the out-of-scope question stopped at `grade` in 0.1 s without an LLM call.
+- The flash-lite model is weaker than Gemini 4; answer quality is measured in the M5 answer eval. The fallback (3.8-flash) gives better answers when it responds in time, but under the 25 s limit it mostly costs time: revisit when it is faster.
+- Free-tier behavior changes from hour to hour; re-run `bench-llm` before relying on these numbers.

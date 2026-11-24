@@ -41,7 +41,9 @@ from vnlaw_rag.llm.base import (
 log = logging.getLogger(__name__)
 
 RETRYABLE_STATUS = {429, 500, 502, 503, 504}
-RETRYABLE_ERROR_NAMES = {"APIConnectionError", "APITimeoutError", "CallTimeout"}
+# StreamError: an `error` event in the middle of a stream (seen in the 2026-11-24 benchmark);
+# retried unless it carries a 4xx status other than 429.
+RETRYABLE_ERROR_NAMES = {"APIConnectionError", "APITimeoutError", "CallTimeout", "StreamError"}
 MIN_CALL_SECONDS = 3.0  # do not start a call with less time than this left in the budget
 
 
@@ -66,7 +68,11 @@ def status_of(exc: BaseException) -> int | None:
 
 
 def is_retryable(exc: BaseException) -> bool:
-    return status_of(exc) in RETRYABLE_STATUS or type(exc).__name__ in RETRYABLE_ERROR_NAMES
+    status = status_of(exc)
+    if status in RETRYABLE_STATUS:
+        return True
+    client_error = status is not None and 400 <= status < 500
+    return type(exc).__name__ in RETRYABLE_ERROR_NAMES and not client_error
 
 
 class GeminiClient:
@@ -123,12 +129,14 @@ class GeminiClient:
         on_event: OnEvent | None = None,
     ) -> StructuredResult[T]:
         deadline = self._clock() + self.deadline_seconds
-        model_index, last_exc = 0, None
+        last_exc = None
         for attempt in range(1, self.max_attempts + 1):
             remaining = deadline - self._clock()
             if remaining < MIN_CALL_SECONDS:
                 break
-            model = self.models[model_index]
+            # Models take turns: main, fallback, main, ... A failed model is not retried
+            # right away while another one can be tried; with one model, back off instead.
+            model = self.models[(attempt - 1) % len(self.models)]
             timeout = min(self.call_timeout_seconds, remaining)
             try:
                 text = self._call(model, system, prompt, schema, timeout, on_text)
@@ -138,13 +146,17 @@ class GeminiClient:
                         f"{model}: {type(exc).__name__} (status {status_of(exc)})"
                     ) from exc
                 last_exc = exc
-                log.warning("%s: %s (status %s)", model, type(exc).__name__, status_of(exc))
-                if model_index + 1 < len(self.models):
-                    model_index += 1  # switch at once: another model has its own load/quota
+                log.warning(
+                    "%s: %s (status %s): %s",
+                    model,
+                    type(exc).__name__,
+                    status_of(exc),
+                    str(exc)[:200],
+                )
+                following = self.models[attempt % len(self.models)]
+                if following != model:  # switch at once: another model, its own load/quota
                     if on_event:
-                        on_event(
-                            {"stage": "fallback", "from": model, "to": self.models[model_index]}
-                        )
+                        on_event({"stage": "fallback", "from": model, "to": following})
                     continue
                 delay = min(self.backoff_seconds * 2 ** (attempt - 1), deadline - self._clock())
                 if delay > 0:

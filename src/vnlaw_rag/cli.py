@@ -136,6 +136,8 @@ def bench_llm(
         "gemini-4-hydrogen,gemini-3.8-flash", help="Comma-separated model ids."
     ),
     pause: float = typer.Option(4.0, help="Seconds between calls (free-tier per-minute limits)."),
+    questions: str = typer.Option("", help="Comma-separated golden ids (default: 5 reviewed)."),
+    out: str = typer.Option("data/eval/llm_latency.json", help="Result file."),
 ) -> None:
     """LLM latency/reliability on 5 reviewed questions per model (5 requests per model)."""
     from vnlaw_rag.config import REPO_ROOT
@@ -144,10 +146,11 @@ def bench_llm(
     def show(sample) -> None:  # one line per call as soon as it is measured
         print(f"  {sample}", flush=True)
 
+    kwargs = {"question_ids": tuple(questions.split(","))} if questions else {}
     result = run_latency_bench(
-        get_settings(), models.split(","), pause_seconds=pause, on_sample=show
+        get_settings(), models.split(","), pause_seconds=pause, on_sample=show, **kwargs
     )
-    write_latency(result, REPO_ROOT / "data" / "eval" / "llm_latency.json")
+    write_latency(result, REPO_ROOT / out)
     for model, s in result["summary"].items():
         typer.echo(
             f"{model:<20} n {s['n']}  errors {s['errors']}  TTFT p50 {s['ttft_p50_s']} s  "

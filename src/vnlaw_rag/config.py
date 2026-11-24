@@ -46,9 +46,11 @@ class Settings(BaseSettings):
     # LLM (Google Gemini API, free tier). The key is a SecretStr so it never shows up in
     # logs or reprs; it is read from the environment or .env and never written anywhere.
     gemini_api_key: SecretStr | None = None
-    # Strongest model in the free tier when checked (2026-11-24); see docs/decisions/007.
-    llm_model: str = "gemini-4-hydrogen"
-    llm_fallback_model: str | None = "gemini-3.8-flash"  # used once if the main one is 429
+    # Chosen by measurement (docs/decisions/008, 2026-11-24): the only model that answered
+    # within the 25 s call limit (4/5, p50 1.7 s). The fallback is another generation with
+    # better answers but slower; on failure models take turns: lite, 3.8-flash, lite.
+    llm_model: str = "gemini-3.5-flash-lite"
+    llm_fallback_model: str | None = "gemini-3.8-flash"
     llm_max_sources: int = 6  # retrieved chunks given to the model
     llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
     llm_max_output_tokens: int = 2048

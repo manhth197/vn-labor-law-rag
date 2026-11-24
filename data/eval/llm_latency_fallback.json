@@ -1,0 +1,52 @@
+{
+ "date": "2026-11-24 06:56 UTC",
+ "git": "c51d5c4-dirty",
+ "settings": {
+  "call_timeout_s": 25.0,
+  "thinking_level": "low",
+  "max_sources": 6,
+  "pause_s": 4.0
+ },
+ "questions": [
+  "q004",
+  "q025",
+  "q039"
+ ],
+ "summary": {
+  "gemini-3.1-flash-lite": {
+   "n": 3,
+   "errors": 3,
+   "error_rate": 1.0,
+   "ttft_p50_s": null,
+   "total_p50_s": null,
+   "total_p95_s": null,
+   "mean_total_s": null
+  }
+ },
+ "samples": [
+  {
+   "model": "gemini-3.1-flash-lite",
+   "question_id": "q004",
+   "ok": false,
+   "ttft_s": null,
+   "total_s": 20.42,
+   "error": "StreamError (status None)"
+  },
+  {
+   "model": "gemini-3.1-flash-lite",
+   "question_id": "q025",
+   "ok": false,
+   "ttft_s": null,
+   "total_s": 27.03,
+   "error": "CallTimeout (status None)"
+  },
+  {
+   "model": "gemini-3.1-flash-lite",
+   "question_id": "q039",
+   "ok": false,
+   "ttft_s": null,
+   "total_s": 27.03,
+   "error": "CallTimeout (status None)"
+  }
+ ]
+}

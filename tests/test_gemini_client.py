@@ -95,11 +95,26 @@ def test_overload_or_rate_limit_switches_model_at_once(failure):
     assert events == [{"stage": "fallback", "from": "main", "to": "fb"}]
 
 
-def test_after_the_last_model_retries_back_off_within_the_budget():
+def test_models_take_turns_without_waiting():
     client, interactions, clock = make([FakeStatusError(503)] * 2 + [GOOD])
     result = ask(client)
-    assert result.model == "fb" and result.attempts == 3
-    assert clock.now == 4  # one backoff (2 s * 2) on the fallback model
+    assert result.model == "main" and result.attempts == 3
+    assert [c["model"] for c in interactions.calls] == ["main", "fb", "main"]
+    assert clock.now == 0
+
+
+def test_single_model_backs_off_between_attempts():
+    client, interactions, clock = make([FakeStatusError(503)] * 2 + [GOOD], models=("main",))
+    result = ask(client)
+    assert result.attempts == 3
+    assert clock.now == 2 + 4  # 2 s, then 4 s
+
+
+def test_stream_error_without_status_is_retried_but_4xx_is_not():
+    from vnlaw_rag.llm.gemini import StreamError
+
+    assert is_retryable(StreamError("busy"))
+    assert not is_retryable(StreamError("bad request", 400))
 
 
 def test_time_budget_exhausted_raises_unavailable():
@@ -110,8 +125,8 @@ def test_time_budget_exhausted_raises_unavailable():
     client, interactions, _ = make([slow_timeout, slow_timeout, slow_timeout], deadline_seconds=60)
     with pytest.raises(Unavailable):
         ask(client)
-    # 25 s + 25 s used; the third call gets the remaining 10 s at most
-    assert [c["timeout"] for c in interactions.calls] == [25, 25, 6]  # 10 s minus 4 s backoff
+    # 25 s + 25 s used; the third call (back on the main model) gets the remaining 10 s
+    assert [c["timeout"] for c in interactions.calls] == [25, 25, 10]
 
 
 def test_rate_limit_on_every_model_raises_rate_limited():
