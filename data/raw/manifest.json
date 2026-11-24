@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "doc_short": "BLLD2019",
+      "doc_number": "45/2019/QH14",
+      "url": "https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2019/11/30232/29070-1-2019993-99445-2019-qh14.pdf",
+      "source_url": "https://vanban.chinhphu.vn/?pageid=27160&docid=198540",
+      "path": "BLLD2019_congbao_993-994.pdf",
+      "retrieved_at": "2026-11-24T03:10:42+00:00",
+      "sha256": "3c865f3d92ba23604e316360b902297ddbc0d1c394d3c08a466029a9d43b5b6c",
+      "bytes": 1352965,
+      "matches_pinned_sha256": true
+    },
+    {
+      "doc_short": "ND145",
+      "doc_number": "145/2020/NĐ-CP",
+      "url": "https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2020/12/32732/33806-1-20201203-1204145-2020-nd-cp.pdf",
+      "source_url": "https://vanban.chinhphu.vn/?pageid=27160&docid=201967",
+      "path": "ND145_congbao_1203-1204.pdf",
+      "retrieved_at": "2026-11-24T03:10:43+00:00",
+      "sha256": "3131bee5778b06390f4f62fcffb751fdd78bf14f1a834ae17e0f9c1f319ca65a",
+      "bytes": 1256507,
+      "matches_pinned_sha256": true
+    },
+    {
+      "doc_short": "ND145",
+      "doc_number": "145/2020/NĐ-CP",
+      "url": "https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2020/12/32732/33809-1-20201205-1206145-2020-nd-cp.pdf",
+      "source_url": "https://vanban.chinhphu.vn/?pageid=27160&docid=201967",
+      "path": "ND145_congbao_1205-1206.pdf",
+      "retrieved_at": "2026-11-24T03:10:45+00:00",
+      "sha256": "38de13854df47d0e27ee497b86272f874742cea7e68f1be26d81587ff95f170b",
+      "bytes": 2743013,
+      "matches_pinned_sha256": true
+    }
+  ]
+}
