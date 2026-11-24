@@ -48,7 +48,9 @@ def load_manifest(path: Path) -> dict[str, ManifestEntry]:
 
 def write_manifest(path: Path, entries: Iterable[ManifestEntry]) -> None:
     payload = {"files": [asdict(e) for e in sorted(entries, key=lambda e: e.path)]}
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
 
 
 def fetch_documents(

@@ -1,0 +1,46 @@
+{
+  "parameters": {
+    "tokenizer": "BAAI/bge-m3",
+    "chunk_max_tokens": 1200
+  },
+  "inputs_sha256": {
+    "BLLD2019": "b01d05b9fdba2773136bdc3ab4228ced85a486ff06b5fff008bbf98e51acfc0e",
+    "ND145": "ab7f754a136eaae9b53594fcafa0f5c6fe999c612ba4496c4048373af78bfc3e"
+  },
+  "documents": {
+    "BLLD2019": {
+      "articles": 220,
+      "chapters": 17,
+      "clauses": 638,
+      "points": 267,
+      "appendices": [],
+      "anomalies": []
+    },
+    "ND145": {
+      "articles": 115,
+      "chapters": 12,
+      "clauses": 367,
+      "points": 398,
+      "appendices": [
+        "I (forms)",
+        "II (list)",
+        "III (forms)",
+        "IV (forms)",
+        "V (forms)",
+        "VI (list)"
+      ],
+      "anomalies": []
+    }
+  },
+  "chunks": {
+    "total": 348,
+    "split_articles": [
+      "BLLD2019-D219",
+      "ND145-D114",
+      "ND145-D27",
+      "ND145-D8",
+      "ND145-D89"
+    ],
+    "max_tokens_observed": 1187
+  }
+}
