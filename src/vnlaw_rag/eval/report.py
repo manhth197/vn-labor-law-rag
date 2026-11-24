@@ -80,6 +80,7 @@ def run_retrieval_eval(settings: Settings, golden_path: Path) -> dict:
             runs[label] = evaluate(retriever, items)
     finally:
         store.close()
+    reviewed = {i.id: i.reviewed for i in items}
     return {
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "default": default_label(settings),
@@ -99,6 +100,9 @@ def run_retrieval_eval(settings: Settings, golden_path: Path) -> dict:
             "reviewed": sum(i.reviewed for i in items),
         },
         "summary": {label: summarize(rs) for label, rs in runs.items()},
+        "summary_reviewed": {
+            label: summarize([r for r in rs if reviewed[r.id]]) for label, rs in runs.items()
+        },
         "separation": score_separation(runs["vector"]),
         "results": {label: [asdict(r) for r in rs] for label, rs in runs.items()},
         "items": {i.id: i for i in items},
@@ -124,29 +128,33 @@ def render_markdown(run: dict) -> str:
         f"**Reviewed by the owner: {g['reviewed']}/{g['n']}.** Unanswerable questions are "
         "excluded from the ranking metrics.",
         "",
-        "> **Caveat (golden set chưa duyệt, do agent soạn, có thể thiên lệch).** The questions "
-        "were drafted by the coding agent from the article texts, not by users. Lookup items "
-        "reuse the law's wording, and there are few keyword-heavy questions (exact terms, "
-        "document numbers). Treat the numbers as a development signal until the owner's "
-        "review; they may move after it.",
+        "> **Caveat (golden set do agent soạn, có thể thiên lệch).** The questions were drafted "
+        "by the coding agent from the article texts, not by users. Lookup items reuse the law's "
+        "wording, and there are few keyword-heavy questions (exact terms, document numbers). "
+        f"The owner reviewed a stratified sample of 25 and accepted {g['reviewed']}; the other "
+        "questions are still unreviewed.",
+        "",
+        "### Reviewed subset (owner-reviewed answerable questions)",
+        "",
+        f"Small sample: n = {run['summary_reviewed']['vector']['all']['n']}, so one question "
+        f"moves Hit@k by {100 / run['summary_reviewed']['vector']['all']['n']:.1f} points. "
+        "No unanswerable question is in the reviewed subset.",
+        "",
+        "| Configuration | n | Hit@1 | Hit@5 | MRR@10 | Recall@10 |",
+        "|---|---|---|---|---|---|",
+        *_overall_rows(run, "summary_reviewed"),
         "",
         "Configuration names: `keyword-bigram-tsrank` = OR of syllable pairs ranked by "
         "`ts_rank_cd`; `-idf` = BM25-style IDF weighting computed in SQL; `-stop` = terms with "
         "Vietnamese function words dropped; `hybrid-*` = that keyword leg fused with the "
         "vector leg by RRF.",
         "",
-        "### Overall (answerable questions)",
+        "### All answerable questions (reviewed + unreviewed)",
         "",
-        "| Configuration | Hit@1 | Hit@5 | MRR@10 | Recall@10 |",
-        "|---|---|---|---|---|",
+        "| Configuration | n | Hit@1 | Hit@5 | MRR@10 | Recall@10 |",
+        "|---|---|---|---|---|---|",
+        *_overall_rows(run, "summary"),
     ]
-    for label, summary in run["summary"].items():
-        a = summary["all"]
-        name = f"**{label}** (default)" if label == run["default"] else label
-        lines.append(
-            f"| {name} | {a['hit@1']:.3f} | {a['hit@5']:.3f} | {a['mrr@10']:.3f} "
-            f"| {a['recall@10']:.3f} |"
-        )
     lines += [
         "",
         "### By question type: Hit@5 / MRR@10",
@@ -188,6 +196,18 @@ def render_markdown(run: dict) -> str:
         )
     lines += [END]
     return "\n".join(lines) + "\n"
+
+
+def _overall_rows(run: dict, key: str) -> list[str]:
+    rows = []
+    for label, summary in run[key].items():
+        a = summary["all"]
+        name = f"**{label}** (default)" if label == run["default"] else label
+        rows.append(
+            f"| {name} | {a['n']} | {a['hit@1']:.3f} | {a['hit@5']:.3f} | {a['mrr@10']:.3f} "
+            f"| {a['recall@10']:.3f} |"
+        )
+    return rows
 
 
 def _hit5(result: dict) -> bool:

@@ -17,7 +17,6 @@ openpyxl is a dev dependency and imported lazily.
 
 from __future__ import annotations
 
-import json
 import math
 import random
 import re
@@ -25,7 +24,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from vnlaw_rag.eval.golden import GoldenItem, Ref, UnitKey, load_golden
+from vnlaw_rag.eval.golden import GoldenItem, Ref, UnitKey, load_golden, write_golden
 
 DOC_LABELS = {"BLLD2019": "BLLĐ 2019", "ND145": "NĐ 145/2020"}
 LABEL_DOCS = {v: k for k, v in DOC_LABELS.items()}
@@ -201,7 +200,7 @@ def import_review(xlsx_path: Path, golden_path: Path, removed_path: Path) -> Imp
             item.reviewed, item.review_status = False, "needs_fix"
         summary.counts[item.review_status] += 1
 
-    _write_jsonl(golden_path, items.values())
+    write_golden(golden_path, items.values())
     if removed:
         with removed_path.open("a", encoding="utf-8", newline="\n") as fh:
             for item in removed:
@@ -220,9 +219,3 @@ def _apply_edits(item: GoldenItem, question, refs_cell, answer) -> bool:
         if refs and [r.key() for r in refs] != [r.key() for r in item.expected]:
             item.expected, edited = refs, True
     return edited
-
-
-def _write_jsonl(path: Path, items) -> None:
-    with path.open("w", encoding="utf-8", newline="\n") as fh:
-        for item in items:
-            fh.write(json.dumps(item.model_dump(exclude_none=True), ensure_ascii=False) + "\n")

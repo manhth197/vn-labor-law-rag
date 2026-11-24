@@ -7,6 +7,7 @@ caught mechanically before the owner's manual review (`reviewed: false` until th
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Iterable
 from pathlib import Path
@@ -38,6 +39,10 @@ class GoldenItem(BaseModel):
     expected: list[Ref] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
     reference_answer: str
+    # The reference answer was checked against the law in force on `as_of`; it may stop being
+    # correct on `valid_until` (a known amendment takes effect). ISO dates.
+    as_of: str | None = None
+    valid_until: str | None = None
     reviewed: bool = False
     drafted_by: str = ""
     notes: str | None = None
@@ -52,6 +57,12 @@ class GoldenItem(BaseModel):
 def load_golden(path: Path) -> list[GoldenItem]:
     with path.open(encoding="utf-8") as fh:
         return [GoldenItem.model_validate_json(row) for row in fh if row.strip()]
+
+
+def write_golden(path: Path, items: Iterable[GoldenItem]) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as fh:
+        for item in items:
+            fh.write(json.dumps(item.model_dump(exclude_none=True), ensure_ascii=False) + "\n")
 
 
 def _norm(text: str) -> str:
