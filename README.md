@@ -7,7 +7,7 @@ Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Ngh�
 - **Structured ingestion:** a layout-aware parser turns the official gazette PDFs into Điều / Khoản / Điểm (inserted clauses such as "8a" and footnotes included), and each article becomes one retrieval chunk.
 - **Measured choices:** vector, keyword and hybrid retrieval were compared on a golden set, and the LLM was picked by success rate and latency. Answers are scored with deterministic metrics first; an LLM judge is a secondary check.
 - **Guarded answers:** every citation must belong to the retrieved chunks, weak retrieval scores stop before the LLM is called, and amendment warnings come from metadata, not from the model.
-- **Shipping:** FastAPI with SSE streaming, a Vietnamese chat UI, Docker Compose, and GitHub Actions CI (with a pgvector service) that never calls a paid API.
+- **Shipping:** FastAPI with SSE streaming, a Vietnamese chat UI, an MCP server for agent clients, Docker Compose, and GitHub Actions CI (with a pgvector service) that never calls a paid API.
 
 **Not legal advice.** Notice shown with answers: *Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.* The Labor Code used here is the consolidated text 125/VBHN-VPQH, i.e. the law in force including amendments up to 27/08/2025. Nghị định 145/2020/NĐ-CP is the original text. Changes announced after that are tracked in [an amendment registry](#amendments) and flagged on the articles they touch.
 
@@ -92,6 +92,7 @@ python -m venv .venv
 pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only PyTorch first
 pip install -e ".[dev]"            # app + tests
 pip install -e ".[ingest]"         # only to re-extract text from the PDFs (PyMuPDF, AGPL)
+pip install -e ".[mcp]"            # only for the MCP server
 
 python -m vnlaw_rag.cli fetch      # optional: download the gazette PDFs to data/raw (3 requests)
 python -m vnlaw_rag.cli parse      # PDF -> data/interim -> data/processed (the outputs are committed)
@@ -181,6 +182,27 @@ LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found)
 
 The screenshots above were taken in Microsoft Edge with `scripts/screenshots.py` (Playwright, system browser, no download) against a local server. The answers took 2.3 s, 1.4 s and 0.1 s; the threshold was 0.55 at the time.
 
+## MCP server
+
+`python -m vnlaw_rag.cli mcp` exposes the same retriever, article index and answer graph as [Model Context Protocol](https://modelcontextprotocol.io) tools over stdio, for Claude Code, Claude Desktop or an IDE. It uses the official `mcp` SDK 2.3 and needs `pip install -e ".[mcp]"`.
+
+| Tool | Returns | Gemini call |
+|---|---|---|
+| `search_labor_law(query, top_k=6)` | Passages with article reference, similarity score, official link, amendment notes | no |
+| `get_labor_law_article(doc, article_no)` | Full text of one article (`BLLD2019` or `ND145`) with its amendment notes | no |
+| `ask_labor_law(question)` | Cited answer in Vietnamese, amendment warnings, corpus notice; citations verified as in the API | yes |
+
+Client configuration (use absolute paths):
+
+```json
+{"mcpServers": {"vn-labor-law": {"command": "<repo>/.venv/Scripts/python", "args": ["-m", "vnlaw_rag.cli", "mcp"], "cwd": "<repo>"}}}
+```
+
+- The server reads `.env` from its working directory: set `cwd` to the repository, or pass `GEMINI_API_KEY` in the client's `env`. Only `ask_labor_law` needs the key.
+- bge-m3 and the database pool open on the first tool call that needs them. Listing tools and reading an article load nothing heavy.
+- In a stdio check on 2026-11-24, the first search took 45.5 s, including the model load.
+- Tests drive the tools through an in-memory MCP client with a fake retriever and a fake LLM ([decision 010](docs/decisions/010-mcp-server.md)).
+
 ## Known limitations
 
 - **Small evaluation:**
@@ -258,6 +280,7 @@ When the amending law is published in Công báo, its number and exact articles 
 - [007 Gemini generation, verified citations, code-level warnings](docs/decisions/007-gemini-generation-and-citation-checks.md)
 - [008 LLM latency policy and streaming](docs/decisions/008-llm-latency-policy-and-streaming.md)
 - [009 Answer evaluation: deterministic metrics first, LLM judge second](docs/decisions/009-answer-evaluation.md)
+- [010 MCP server over stdio](docs/decisions/010-mcp-server.md)
 
 ## License
 

@@ -38,6 +38,9 @@ Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which 
 - `GET /health`
 - A static chat UI at `/` (vanilla HTML/JS, Vietnamese). Citations appear as expandable cards with the source text and a link to the official page.
 
+## MCP server (stdio)
+- `python -m vnlaw_rag.cli mcp` (`mcp_server.py`, optional extra `[mcp]`): tools `search_labor_law` (no LLM call), `get_labor_law_article` and `ask_labor_law`. The tools call the same retriever, graph and article index as the API, opened lazily on the first call that needs them. See `docs/decisions/010-mcp-server.md`.
+
 ## Evaluation
 - Golden set `data/eval/golden.jsonl`: 77 Vietnamese questions (numeric 23, paraphrase 19, lookup 15, multi 10, unanswerable 10) with expected article references, evidence quotes (checked by a test to occur in the expected articles) and a short reference answer. Drafted by the coding agent; the owner reviewed a stratified sample of 25 through an Excel workbook (`review-export` / `review-import`) and accepted 22.
 - **Retrieval metrics** (no LLM, free): Hit@k, MRR@10, broken down by question type. Re-run after every retrieval change.
@@ -56,6 +59,7 @@ src/vnlaw_rag/
   graph/   state.py nodes.py build.py prompts.py references.py
   llm/     base.py gemini.py
   api/     main.py static/ (index.html app.js style.css)
+  mcp_server.py        # MCP tools over stdio
   eval/    golden.py retrieval.py report.py review.py latency.py answers.py
 tests/                 # fake LLM and fake embeddings; DB integration tests against pgvector
 scripts/screenshots.py # Playwright with the system Edge
@@ -77,4 +81,4 @@ docker-compose.yml  Dockerfile  .github/workflows/ci.yml  .env.example  pyprojec
 | M3 | Graph + generation | LangGraph flow with routing, grading and not-found path; Gemini answers with verified citations; unit tests with a fake LLM | done |
 | M4 | API + UI | FastAPI endpoints incl. SSE streaming; chat UI with citation cards and disclaimer | done (browser-tested in Edge) |
 | M5 | Eval, Docker, CI | Answer eval (approved run) in docs/EVAL.md; `docker compose up` runs everything; CI green | done (CI green on GitHub) |
-| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment | done except the demo GIF (screenshots instead) and the reranker experiment |
+| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment | done, plus an MCP server (decision 010); screenshots instead of a demo GIF; the reranker experiment is still open |

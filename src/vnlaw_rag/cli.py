@@ -131,6 +131,20 @@ def serve(
     uvicorn.run("vnlaw_rag.api.main:create_app", factory=True, host=host, port=port, workers=1)
 
 
+@app.command("mcp")
+def mcp() -> None:
+    """MCP server over stdio: search_labor_law, get_labor_law_article, ask_labor_law.
+
+    Needs the extra: pip install -e ".[mcp]". stdout carries the protocol; logs go to stderr.
+    """
+    try:
+        from vnlaw_rag.mcp_server import build_server
+    except ImportError as exc:  # the optional `mcp` package is missing
+        typer.echo(f'{exc}. Install the extra: pip install -e ".[mcp]"', err=True)
+        raise typer.Exit(1) from exc
+    build_server().run("stdio")
+
+
 @app.command("bench-llm")
 def bench_llm(
     models: str = typer.Option(

@@ -37,6 +37,8 @@ dependencies = [
 # so it lives in its own extra and the serving code (API, retrieval) never imports it.
 # See docs/decisions/001-corpus-source-and-pdf-extraction.md.
 ingest = ["pymupdf>=1.24"]
+# MCP server over stdio (python -m vnlaw_rag.cli mcp); not needed by the API or the image.
+mcp = ["mcp>=2.3,<3"]
 dev = [
     "pytest>=8.0",
     "ruff==0.17.6",  # pinned: format output differs between ruff versions
