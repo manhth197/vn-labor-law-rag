@@ -4,13 +4,13 @@ Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Ngh�
 
 > Work in progress: milestones M1 (corpus and parsing) and M2 (index and retrieval) are done. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
 
-**Not legal advice.** The corpus is the original text of Bộ luật Lao động số 45/2019/QH14 (passed 20/11/2019) and Nghị định số 145/2020/NĐ-CP (signed 14/12/2020), as published in the Official Gazette. Later amendments are **not** reflected yet (see [Future work](#future-work): one clause is already in force, a larger amending law takes effect on 01/03/2027).
+**Not legal advice.** Notice shown with answers: *Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.* The Labor Code is the consolidated text 125/VBHN-VPQH (the law in force, including amendments up to 27/08/2025); Nghị định 145/2020/NĐ-CP is the original text. Changes announced after that are tracked in [an amendment registry](#amendments) and flagged on the articles they touch.
 
 ## Corpus
 
 | Document | Short id | Articles | Source |
 |---|---|---|---|
-| Bộ luật Lao động 45/2019/QH14 | `BLLD2019` | 220 (17 chapters) | [vanban.chinhphu.vn](https://vanban.chinhphu.vn/?pageid=27160&docid=198540), text from [Công báo 993+994](https://congbao.chinhphu.vn/van-ban/nghi-quyet-so-45-2019-qh14-30232.htm) |
+| Bộ luật Lao động 45/2019/QH14, consolidated text 125/VBHN-VPQH (27/08/2025) | `BLLD2019` | 220 (17 chapters) | [Công báo 1309+1310](https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm); law page on [vanban.chinhphu.vn](https://vanban.chinhphu.vn/?pageid=27160&docid=198540) |
 | Nghị định 145/2020/NĐ-CP | `ND145` | 115 (+ 6 appendices) | [vanban.chinhphu.vn](https://vanban.chinhphu.vn/?pageid=27160&docid=201967), text from [Công báo 1203–1206](https://congbao.chinhphu.vn/van-ban/nghi-dinh-so-145-2020-nd-cp-32732.htm) |
 
 Vietnamese normative legal documents are not protected by copyright (Law on Intellectual Property, Art. 15), so the extracted text is kept in the repo.
@@ -41,22 +41,22 @@ ruff check . && ruff format --check .
 ```
 
 - `parse` works without the PDFs or PyMuPDF: it then reuses the committed `data/interim/*.lines.jsonl`. It downloads the bge-m3 tokenizer file once (to count chunk tokens exactly).
-- `index` downloads bge-m3 once (about 2.3 GB). The model revision is pinned (`EMBEDDING_REVISION`, the Hub's safetensors conversion of the same weights), so only one weight file is cached and offline runs work. Embedding 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/`, so re-indexing is fast.
+- `index` downloads bge-m3 once (about 2.3 GB). The model revision is pinned (`EMBEDDING_REVISION`, the Hub's safetensors conversion of the same weights), so only one weight file is cached and offline runs work. Embedding all 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/` by the hash of each chunk's text, so after a corpus update only changed chunks are embedded again (5 chunks, 9.6 s, for the switch to the consolidated text).
 - Use `127.0.0.1` rather than `localhost` in `DATABASE_URL` on Windows: `localhost` tries IPv6 first and the container port is bound to IPv4 only, which costs a connection timeout.
 - Configuration is read from environment variables or `.env` (see `.env.example`).
 
 ## Retrieval results
 
-Draft golden set (77 questions, not yet reviewed by the owner, written by the coding agent: may be biased). Full tables, per-type numbers, date and git revision: [docs/EVAL.md](docs/EVAL.md).
+Golden set: 77 questions drafted by the coding agent (may be biased); the owner reviewed a stratified sample of 25 and accepted 22 (the 3 left blank were the out-of-scope items). Main numbers below are on the **22 reviewed answerable questions**, a small sample: one question moves Hit@k by 4.5 points. Full tables (all 77, per type, date, git revision): [docs/EVAL.md](docs/EVAL.md).
 
-| Configuration | Hit@5 | MRR@10 |
-|---|---|---|
-| **vector only, bge-m3 (default)** | 0.955 | 0.858 |
-| keyword: syllable pairs + BM25-style IDF in SQL | 0.731 | 0.615 |
-| keyword: syllable pairs + `ts_rank_cd` | 0.313 | 0.173 |
-| hybrid RRF (vector + IDF keyword) | 0.940 | 0.768 |
+| Configuration | Hit@1 | Hit@5 | MRR@10 |
+|---|---|---|---|
+| **vector only, bge-m3 (default)** | 0.864 | 0.909 | 0.891 |
+| keyword: syllable pairs + BM25-style IDF in SQL | 0.591 | 0.773 | 0.667 |
+| keyword: syllable pairs + `ts_rank_cd` | 0.045 | 0.227 | 0.152 |
+| hybrid RRF (vector + IDF keyword, function words dropped) | 0.773 | 0.955 | 0.829 |
 
-Vector-only is the default because hybrid fusion did not beat it on this set ([decision 005](docs/decisions/005-retrieval-mode-vector-default.md)); hybrid stays available with `RETRIEVAL_MODE=hybrid`.
+On all 67 answerable questions: vector Hit@5 0.955 / MRR@10 0.858, hybrid 0.940 / 0.768. Vector-only is the default: hybrid finds one more reviewed question in the top 5 but ranks the right article lower on average ([decision 005](docs/decisions/005-retrieval-mode-vector-default.md)); it stays available with `RETRIEVAL_MODE=hybrid`.
 
 ### Reviewing the golden set
 
@@ -77,7 +77,8 @@ pytest tests/test_eval.py                                  # re-checks evidence 
 | `data/processed/appendices.jsonl` | Phụ lục (lists in full, forms as a table of contents) | yes |
 | `data/processed/chunks.jsonl` | Retrieval chunks with metadata | yes |
 | `data/processed/build_info.json` | Counts, parameters, input hashes, parser anomalies | yes |
-| `data/cache/*.npy` | Cached chunk embeddings | no |
+| `data/amendments.json` | Amendment registry: status, effective date, affected articles, official source | yes |
+| `data/cache/*.npz` | Cached chunk embeddings, keyed by text hash | no |
 | `data/eval/golden.jsonl` | Golden set: questions, expected articles, evidence quotes, reference answers | yes |
 | `data/eval/retrieval_results.json` | Per-question ranks of the last retrieval eval | yes |
 | `data/eval/review-golden.xlsx` | Review workbook for the owner | yes |
@@ -89,14 +90,19 @@ pytest tests/test_eval.py                                  # re-checks evidence 
 - [003 Article-level chunking](docs/decisions/003-article-level-chunking.md)
 - [004 Own pgvector SQL instead of langchain-postgres](docs/decisions/004-own-pgvector-sql-instead-of-langchain-postgres.md)
 - [005 Default retrieval: vector-only, hybrid measured](docs/decisions/005-retrieval-mode-vector-default.md)
+- [006 Consolidated text and amendment registry](docs/decisions/006-consolidated-text-and-amendment-registry.md)
 
-## Future work
+## Amendments
 
-Known amendments not yet in the corpus (checked 2026-11-24 on official sources):
+`data/amendments.json` (checked 2026-11-24 on official sources) drives the `amended_by` and `upcoming_change` fields of each chunk:
 
-- **Bộ luật Lao động, in force since 01/01/2026:** clause 8a added to Điều 154 (high-quality digital technology workforce exempt from work permits) by khoản 4 Điều 49 of Luật Công nghiệp công nghệ số 71/2025/QH15. It is the only change in the consolidated text 125/VBHN-VPQH (27/08/2025, [Công báo 1309+1310](https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm)); an article-by-article comparison found no other substantive difference.
-- **Bộ luật Lao động, from 01/03/2027:** the law amending the Labor Code and four other laws, passed on 21/11/2026 ([Báo Chính phủ](https://baochinhphu.vn/quoc-hoi-dong-y-bo-sung-2-ngay-nghi-le-duoc-huong-nguyen-luong-102261121121448218.htm)): labor leasing moves from a license to deposit + notification, two new paid public holidays (27/7 and 24/11), and changes to collective bargaining, the National Wage Council, labor management and strikes. Article list to be added when the text is published in Công báo.
-- **Nghị định 145/2020:** a draft amending decree was published for comment in July 2026 (labor leasing, Phụ lục II); not issued as far as we found.
+| Amending document | Status | Effective | Articles | In the text? |
+|---|---|---|---|---|
+| Luật Công nghiệp công nghệ số 71/2025/QH15 | in force | 01/01/2026 | BLLĐ Điều 154 khoản 8a (from the VBHN footnote) | yes (VBHN 125) |
+| Law amending the Labor Code and four other laws, passed 21/11/2026 ([Báo Chính phủ](https://baochinhphu.vn/quoc-hoi-dong-y-bo-sung-2-ngay-nghi-le-duoc-huong-nguyen-luong-102261121121448218.htm)) | passed, text not yet published | 01/03/2027 | inferred from the topics: Điều 52-58 (labor leasing), 65-74 (collective bargaining), 92 (wage council), 112 (public holidays), 198-211 (strikes); NĐ 145 Điều 21-29, 49-53 | no: flagged as upcoming |
+| Draft decree amending Nghị định 145 (July 2026) | draft | none | none | recorded only, never used in answers |
+
+When the amending law is published in Công báo, its number and exact articles replace the inferred ones; when a new consolidated text appears, the corpus moves to it.
 
 ## License
 

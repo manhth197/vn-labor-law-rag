@@ -16,5 +16,5 @@ We need the exact text of Bộ luật Lao động 2019 (45/2019/QH14) and Nghị
 - The gazette `.doc` files: legacy binary Word format, needs LibreOffice or antiword to convert.
 
 ## Consequences
-- The corpus is the **original text as promulgated**, not a consolidated version: later amendments are not reflected. Stated in README, ARCHITECTURE and (M4) the UI disclaimer. Future work: switch the Labor Code to the consolidated text 125/VBHN-VPQH (27/08/2025, Công báo 1309+1310); check whether Nghị định 145 has been amended (a draft amending decree was published for comment in July 2026).
+- The corpus was the **original text as promulgated**. Update 2026-11-24: the Labor Code now comes from its consolidated text 125/VBHN-VPQH, with later amendments tracked in a registry (decision 006). The source choice (Công báo text PDFs + PyMuPDF) is unchanged.
 - If an upstream PDF changes, `fetch` reports "CHANGED UPSTREAM" and the parser tests catch structural drift.

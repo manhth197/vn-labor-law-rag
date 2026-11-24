@@ -5,29 +5,45 @@ No invented numbers: every table below is produced by a command and records its 
 <!-- retrieval:start -->
 ## Retrieval
 
-Run: 2026-11-24 · git `bda2382` · command `python -m vnlaw_rag.cli eval`
+Run: 2026-11-24 · git `34f32e8` · command `python -m vnlaw_rag.cli eval`
 
-- Embeddings: `BAAI/bge-m3` (normalized, cosine, HNSW). Chunks: 348 (max 1200 tokens), chunks.jsonl sha256 `00f23290ee18`.
+- Embeddings: `BAAI/bge-m3` (normalized, cosine, HNSW). Chunks: 348 (max 1200 tokens), chunks.jsonl sha256 `bde32be6ba62`.
 - Candidates: vector top 20, keyword top 20; RRF k = 60. Metrics at depth 10, article-level matching.
-- Golden set: `data/eval/golden.jsonl`, 77 questions (numeric 23, lookup 15, paraphrase 19, multi 10, unanswerable 10). **Reviewed by the owner: 0/77.** Unanswerable questions are excluded from the ranking metrics.
+- Golden set: `data/eval/golden.jsonl`, 77 questions (numeric 23, lookup 15, paraphrase 19, multi 10, unanswerable 10). **Reviewed by the owner: 22/77.** Unanswerable questions are excluded from the ranking metrics.
 
-> **Caveat (golden set chưa duyệt, do agent soạn, có thể thiên lệch).** The questions were drafted by the coding agent from the article texts, not by users. Lookup items reuse the law's wording, and there are few keyword-heavy questions (exact terms, document numbers). Treat the numbers as a development signal until the owner's review; they may move after it.
+> **Caveat (golden set do agent soạn, có thể thiên lệch).** The questions were drafted by the coding agent from the article texts, not by users. Lookup items reuse the law's wording, and there are few keyword-heavy questions (exact terms, document numbers). The owner reviewed a stratified sample of 25 and accepted 22; the other questions are still unreviewed.
+
+### Reviewed subset (owner-reviewed answerable questions)
+
+Small sample: n = 22, so one question moves Hit@k by 4.5 points. No unanswerable question is in the reviewed subset.
+
+| Configuration | n | Hit@1 | Hit@5 | MRR@10 | Recall@10 |
+|---|---|---|---|---|---|
+| **vector** (default) | 22 | 0.864 | 0.909 | 0.891 | 0.955 |
+| keyword-bigram-tsrank | 22 | 0.045 | 0.227 | 0.152 | 0.417 |
+| keyword-bigram-idf | 22 | 0.591 | 0.773 | 0.667 | 0.818 |
+| keyword-bigram-idf-stop | 22 | 0.409 | 0.864 | 0.587 | 0.848 |
+| keyword-unigram-idf-stop | 22 | 0.227 | 0.500 | 0.345 | 0.614 |
+| hybrid-bigram-tsrank | 22 | 0.455 | 0.818 | 0.608 | 0.894 |
+| hybrid-bigram-idf | 22 | 0.773 | 0.909 | 0.827 | 0.955 |
+| hybrid-bigram-idf-stop | 22 | 0.773 | 0.955 | 0.829 | 0.955 |
+| hybrid-unigram-idf-stop | 22 | 0.545 | 0.864 | 0.667 | 0.909 |
 
 Configuration names: `keyword-bigram-tsrank` = OR of syllable pairs ranked by `ts_rank_cd`; `-idf` = BM25-style IDF weighting computed in SQL; `-stop` = terms with Vietnamese function words dropped; `hybrid-*` = that keyword leg fused with the vector leg by RRF.
 
-### Overall (answerable questions)
+### All answerable questions (reviewed + unreviewed)
 
-| Configuration | Hit@1 | Hit@5 | MRR@10 | Recall@10 |
-|---|---|---|---|---|
-| **vector** (default) | 0.776 | 0.955 | 0.858 | 0.970 |
-| keyword-bigram-tsrank | 0.075 | 0.313 | 0.173 | 0.455 |
-| keyword-bigram-idf | 0.537 | 0.731 | 0.615 | 0.806 |
-| keyword-bigram-idf-stop | 0.388 | 0.761 | 0.545 | 0.811 |
-| keyword-unigram-idf-stop | 0.284 | 0.537 | 0.397 | 0.659 |
-| hybrid-bigram-tsrank | 0.373 | 0.761 | 0.536 | 0.920 |
-| hybrid-bigram-idf | 0.701 | 0.910 | 0.791 | 0.963 |
-| hybrid-bigram-idf-stop | 0.657 | 0.940 | 0.768 | 0.963 |
-| hybrid-unigram-idf-stop | 0.642 | 0.881 | 0.748 | 0.948 |
+| Configuration | n | Hit@1 | Hit@5 | MRR@10 | Recall@10 |
+|---|---|---|---|---|---|
+| **vector** (default) | 67 | 0.776 | 0.955 | 0.858 | 0.970 |
+| keyword-bigram-tsrank | 67 | 0.075 | 0.313 | 0.173 | 0.455 |
+| keyword-bigram-idf | 67 | 0.537 | 0.731 | 0.615 | 0.806 |
+| keyword-bigram-idf-stop | 67 | 0.388 | 0.761 | 0.545 | 0.811 |
+| keyword-unigram-idf-stop | 67 | 0.284 | 0.537 | 0.397 | 0.659 |
+| hybrid-bigram-tsrank | 67 | 0.373 | 0.761 | 0.536 | 0.920 |
+| hybrid-bigram-idf | 67 | 0.701 | 0.910 | 0.791 | 0.963 |
+| hybrid-bigram-idf-stop | 67 | 0.657 | 0.940 | 0.768 | 0.963 |
+| hybrid-unigram-idf-stop | 67 | 0.642 | 0.881 | 0.748 | 0.948 |
 
 ### By question type: Hit@5 / MRR@10
 

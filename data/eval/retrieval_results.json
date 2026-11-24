@@ -1,7 +1,7 @@
 {
  "date": "2026-11-24",
  "default": "vector",
- "git": "bda2382",
+ "git": "34f32e8",
  "settings": {
   "embedding_model": "BAAI/bge-m3",
   "vector_k": 20,
@@ -11,8 +11,8 @@
  },
  "index": {
   "chunks": 348,
-  "chunks_sha256": "00f23290ee183c2d12078ecf8852d78f9c04f0561c904f1761f5f251cea09531",
-  "indexed_at": "2026-11-24T04:34:02+00:00"
+  "chunks_sha256": "bde32be6ba62576c374f0d5147007cd2cc0688e1804e1fbf16e77a1e52bcea05",
+  "indexed_at": "2026-11-24T05:16:30+00:00"
  },
  "golden": {
   "path": "data/eval/golden.jsonl",
@@ -24,7 +24,7 @@
    "multi": 10,
    "unanswerable": 10
   },
-  "reviewed": 0
+  "reviewed": 22
  },
  "summary": {
   "vector": {
@@ -357,6 +357,341 @@
     "hit@1": 0.7,
     "hit@5": 1.0,
     "mrr@10": 0.8333333333333334,
+    "recall@10": 1.0
+   }
+  }
+ },
+ "summary_reviewed": {
+  "vector": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.8636363636363636,
+    "hit@5": 0.9090909090909091,
+    "mrr@10": 0.8914141414141414,
+    "recall@10": 0.9545454545454546
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.875,
+    "hit@5": 0.875,
+    "mrr@10": 0.8888888888888888,
+    "recall@10": 1.0
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.6666666666666666,
+    "hit@5": 0.8333333333333334,
+    "mrr@10": 0.75,
+    "recall@10": 0.8333333333333334
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   }
+  },
+  "keyword-bigram-tsrank": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.045454545454545456,
+    "hit@5": 0.22727272727272727,
+    "mrr@10": 0.1516955266955267,
+    "recall@10": 0.41666666666666663
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.0,
+    "hit@5": 0.25,
+    "mrr@10": 0.1388888888888889,
+    "recall@10": 0.4375
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.0,
+    "hit@5": 0.0,
+    "mrr@10": 0.05357142857142857,
+    "recall@10": 0.4
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.0,
+    "hit@5": 0.3333333333333333,
+    "mrr@10": 0.13888888888888887,
+    "recall@10": 0.3333333333333333
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 0.3333333333333333,
+    "hit@5": 0.3333333333333333,
+    "mrr@10": 0.375,
+    "recall@10": 0.5555555555555555
+   }
+  },
+  "keyword-bigram-idf": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.5909090909090909,
+    "hit@5": 0.7727272727272727,
+    "mrr@10": 0.6666666666666669,
+    "recall@10": 0.8181818181818182
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.625,
+    "hit@5": 0.75,
+    "mrr@10": 0.7083333333333334,
+    "recall@10": 0.875
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.8,
+    "hit@5": 1.0,
+    "mrr@10": 0.8666666666666668,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.16666666666666666,
+    "hit@5": 0.5,
+    "mrr@10": 0.27777777777777773,
+    "recall@10": 0.5
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   }
+  },
+  "keyword-bigram-idf-stop": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.4090909090909091,
+    "hit@5": 0.8636363636363636,
+    "mrr@10": 0.5871212121212123,
+    "recall@10": 0.8484848484848485
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.5,
+    "hit@5": 1.0,
+    "mrr@10": 0.7083333333333334,
+    "recall@10": 1.0
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.6,
+    "hit@5": 1.0,
+    "mrr@10": 0.7666666666666667,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.0,
+    "hit@5": 0.5,
+    "mrr@10": 0.18055555555555555,
+    "recall@10": 0.5
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 0.6666666666666666,
+    "hit@5": 1.0,
+    "mrr@10": 0.7777777777777778,
+    "recall@10": 0.8888888888888888
+   }
+  },
+  "keyword-unigram-idf-stop": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.22727272727272727,
+    "hit@5": 0.5,
+    "mrr@10": 0.34469696969696967,
+    "recall@10": 0.6136363636363636
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.5,
+    "hit@5": 0.75,
+    "mrr@10": 0.625,
+    "recall@10": 0.8125
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.0,
+    "hit@5": 0.8,
+    "mrr@10": 0.24999999999999994,
+    "recall@10": 0.8
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.0,
+    "hit@5": 0.0,
+    "mrr@10": 0.05555555555555555,
+    "recall@10": 0.3333333333333333
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 0.3333333333333333,
+    "hit@5": 0.3333333333333333,
+    "mrr@10": 0.3333333333333333,
+    "recall@10": 0.3333333333333333
+   }
+  },
+  "hybrid-bigram-tsrank": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.45454545454545453,
+    "hit@5": 0.8181818181818182,
+    "mrr@10": 0.6075757575757575,
+    "recall@10": 0.893939393939394
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.375,
+    "hit@5": 0.75,
+    "mrr@10": 0.5572916666666667,
+    "recall@10": 0.875
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.4,
+    "hit@5": 1.0,
+    "mrr@10": 0.6066666666666667,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.3333333333333333,
+    "hit@5": 0.6666666666666666,
+    "mrr@10": 0.4791666666666667,
+    "recall@10": 0.8333333333333334
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 0.8888888888888888
+   }
+  },
+  "hybrid-bigram-idf": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.7727272727272727,
+    "hit@5": 0.9090909090909091,
+    "mrr@10": 0.8265151515151515,
+    "recall@10": 0.9545454545454546
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.75,
+    "hit@5": 0.875,
+    "mrr@10": 0.825,
+    "recall@10": 1.0
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.5,
+    "hit@5": 0.8333333333333334,
+    "mrr@10": 0.5972222222222222,
+    "recall@10": 0.8333333333333334
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   }
+  },
+  "hybrid-bigram-idf-stop": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.7727272727272727,
+    "hit@5": 0.9545454545454546,
+    "mrr@10": 0.8287878787878789,
+    "recall@10": 0.9545454545454546
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.875,
+    "hit@5": 1.0,
+    "mrr@10": 0.9,
+    "recall@10": 1.0
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.8,
+    "hit@5": 1.0,
+    "mrr@10": 0.9,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.5,
+    "hit@5": 0.8333333333333334,
+    "mrr@10": 0.5888888888888889,
+    "recall@10": 0.8333333333333334
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 1.0,
+    "hit@5": 1.0,
+    "mrr@10": 1.0,
+    "recall@10": 1.0
+   }
+  },
+  "hybrid-unigram-idf-stop": {
+   "all": {
+    "n": 22,
+    "hit@1": 0.5454545454545454,
+    "hit@5": 0.8636363636363636,
+    "mrr@10": 0.6666666666666666,
+    "recall@10": 0.9090909090909091
+   },
+   "numeric": {
+    "n": 8,
+    "hit@1": 0.75,
+    "hit@5": 0.875,
+    "mrr@10": 0.7916666666666666,
+    "recall@10": 0.875
+   },
+   "lookup": {
+    "n": 5,
+    "hit@1": 0.6,
+    "hit@5": 0.8,
+    "mrr@10": 0.7333333333333333,
+    "recall@10": 1.0
+   },
+   "paraphrase": {
+    "n": 6,
+    "hit@1": 0.3333333333333333,
+    "hit@5": 0.8333333333333334,
+    "mrr@10": 0.47222222222222215,
+    "recall@10": 0.8333333333333334
+   },
+   "multi": {
+    "n": 3,
+    "hit@1": 0.3333333333333333,
+    "hit@5": 1.0,
+    "mrr@10": 0.611111111111111,
     "recall@10": 1.0
    }
   }
@@ -1585,8 +1920,8 @@
      "BLLD2019/article/122",
      "BLLD2019/article/124",
      "BLLD2019/article/123",
-     "BLLD2019/article/127",
      "BLLD2019/article/125",
+     "BLLD2019/article/127",
      "BLLD2019/article/126",
      "BLLD2019/article/217",
      "ND145/article/73",
@@ -1684,8 +2019,8 @@
      "BLLD2019/article/219",
      "ND145/article/8",
      "ND145/article/103",
-     "BLLD2019/article/91",
-     "BLLD2019/article/219"
+     "BLLD2019/article/219",
+     "BLLD2019/article/91"
     ]
    },
    {
@@ -3300,9 +3635,9 @@
      "BLLD2019/article/35",
      "ND145/article/101",
      "ND145/article/89",
+     "BLLD2019/article/154",
      "BLLD2019/article/20",
-     "ND145/article/107",
-     "ND145/article/93"
+     "ND145/article/107"
     ]
    }
   ],
@@ -6240,7 +6575,7 @@
      "ND145/article/94",
      "ND145/article/80",
      "ND145/article/96",
-     "BLLD2019/article/177"
+     "ND145/article/69"
     ]
    },
    {
@@ -7036,8 +7371,8 @@
      "ND145/article/8",
      "BLLD2019/article/41",
      "ND145/article/96",
-     "BLLD2019/article/113",
      "BLLD2019/article/36",
+     "BLLD2019/article/113",
      "ND145/article/80"
     ]
    },
@@ -7054,9 +7389,9 @@
      "ND145/article/5",
      "BLLD2019/article/147",
      "BLLD2019/article/113",
+     "BLLD2019/article/154",
      "ND145/appendix/II",
      "BLLD2019/article/30",
-     "BLLD2019/article/154",
      "ND145/article/27"
     ]
    },
@@ -7202,10 +7537,10 @@
     "ranked_units": [
      "ND145/article/5",
      "ND145/appendix/VI",
+     "BLLD2019/article/154",
      "BLLD2019/article/113",
      "ND145/article/21",
      "ND145/article/38",
-     "BLLD2019/article/154",
      "ND145/article/84",
      "BLLD2019/article/137",
      "BLLD2019/article/151",
@@ -7468,14 +7803,14 @@
     "ranked_units": [
      "BLLD2019/article/150",
      "BLLD2019/article/152",
+     "BLLD2019/article/154",
      "BLLD2019/article/16",
      "BLLD2019/article/170",
      "BLLD2019/article/171",
      "BLLD2019/article/172",
      "BLLD2019/article/173",
      "BLLD2019/article/174",
-     "BLLD2019/article/18",
-     "BLLD2019/article/196"
+     "BLLD2019/article/18"
     ]
    },
    {
@@ -7663,9 +7998,9 @@
      "BLLD2019/article/125",
      "ND145/article/37",
      "ND145/article/69",
+     "BLLD2019/article/154",
      "BLLD2019/article/35",
-     "BLLD2019/article/46",
-     "ND145/article/8"
+     "BLLD2019/article/46"
     ]
    },
    {
@@ -8538,8 +8873,8 @@
      "BLLD2019/article/127",
      "BLLD2019/article/117",
      "ND145/article/69",
-     "BLLD2019/article/125",
      "ND145/article/70",
+     "BLLD2019/article/125",
      "BLLD2019/article/118",
      "ND145/article/73"
     ]
@@ -8902,7 +9237,7 @@
      "BLLD2019/article/124",
      "ND145/article/89",
      "BLLD2019/article/123",
-     "BLLD2019/article/127"
+     "BLLD2019/article/125"
     ]
    },
    {
@@ -9032,8 +9367,8 @@
      "BLLD2019/article/107",
      "ND145/article/59",
      "ND145/article/56",
-     "ND145/article/54",
      "ND145/article/60",
+     "ND145/article/54",
      "ND145/article/67",
      "BLLD2019/article/108"
     ]
@@ -10367,7 +10702,7 @@
      "BLLD2019/article/188",
      "ND145/article/69",
      "ND145/article/73",
-     "BLLD2019/article/131"
+     "BLLD2019/article/125"
     ]
    },
    {
@@ -10495,9 +10830,9 @@
      "BLLD2019/article/98",
      "ND145/article/57",
      "BLLD2019/article/108",
-     "ND145/article/54",
      "BLLD2019/article/107",
      "BLLD2019/article/137",
+     "ND145/article/54",
      "ND145/article/56",
      "BLLD2019/article/146",
      "BLLD2019/article/102"
@@ -11832,7 +12167,7 @@
      "BLLD2019/article/188",
      "ND145/article/69",
      "ND145/article/73",
-     "BLLD2019/article/131"
+     "BLLD2019/article/125"
     ]
    },
    {
@@ -11961,8 +12296,8 @@
      "ND145/article/57",
      "BLLD2019/article/108",
      "BLLD2019/article/107",
-     "ND145/article/54",
      "BLLD2019/article/137",
+     "ND145/article/54",
      "ND145/article/56",
      "ND145/article/59",
      "BLLD2019/article/146"
@@ -13065,10 +13400,10 @@
      "ND145/article/5",
      "BLLD2019/article/19",
      "ND145/appendix/VI",
-     "BLLD2019/article/113",
+     "BLLD2019/article/154",
      "BLLD2019/article/29",
+     "BLLD2019/article/113",
      "BLLD2019/article/81",
-     "ND145/article/38",
      "ND145/article/63"
     ]
    },
@@ -13159,12 +13494,12 @@
      "BLLD2019/article/102",
      "BLLD2019/article/97",
      "ND145/article/89",
-     "BLLD2019/article/101",
      "BLLD2019/article/113",
      "BLLD2019/article/96",
      "BLLD2019/article/100",
      "BLLD2019/article/30",
-     "ND145/article/66"
+     "ND145/article/66",
+     "ND145/article/15"
     ]
    },
    {
@@ -13330,11 +13665,11 @@
      "ND145/article/105",
      "BLLD2019/article/152",
      "BLLD2019/article/209",
-     "BLLD2019/article/16",
+     "BLLD2019/article/154",
      "ND145/appendix/VI",
-     "BLLD2019/article/170",
+     "BLLD2019/article/16",
      "ND145/article/108",
-     "BLLD2019/article/171",
+     "BLLD2019/article/170",
      "ND145/article/109"
     ]
    },
