@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
 
 import typer
 
@@ -166,6 +167,12 @@ def eval_answers(
     report_only: bool = typer.Option(
         False, help="No API call: re-score stored answers (numeric fields) and re-render."
     ),
+    ids: str = typer.Option(
+        "",
+        help="Comma-separated golden ids to re-run under the current configuration; results "
+        "go to answer_rerun.jsonl and the full run is kept as history.",
+    ),
+    reason: str = typer.Option("", help="Why these ids are re-run (shown in EVAL.md)."),
 ) -> None:
     """Answer eval (calls Gemini): citations, refusals, numeric match, LLM judge -> EVAL.md."""
     from datetime import datetime, timezone
@@ -174,9 +181,12 @@ def eval_answers(
     from vnlaw_rag.eval.answers import (
         ANSWERS_END,
         ANSWERS_START,
+        CURRENT_END,
+        CURRENT_START,
         RequestLog,
         load_done,
         render_answers_markdown,
+        render_current_markdown,
         rescore_numeric,
         run_answer_eval,
     )
@@ -188,25 +198,41 @@ def eval_answers(
 
     settings = get_settings()
     eval_dir = REPO_ROOT / "data" / "eval"
-    results_path, run_path = eval_dir / "answer_results.jsonl", eval_dir / "answer_run.json"
+    eval_md = REPO_ROOT / "docs" / "EVAL.md"
+    full_results, full_run = eval_dir / "answer_results.jsonl", eval_dir / "answer_run.json"
+    rerun_results, rerun_run = eval_dir / "answer_rerun.jsonl", eval_dir / "answer_rerun.json"
+    rerun_ids = [i.strip() for i in ids.split(",") if i.strip()]
+    results_path, run_path = (rerun_results, rerun_run) if rerun_ids else (full_results, full_run)
     if fresh:
         results_path.unlink(missing_ok=True)
         run_path.unlink(missing_ok=True)
     previous = json.loads(run_path.read_text("utf-8")) if run_path.exists() else {}
     golden = load_golden(eval_dir / "golden.jsonl")
-    items = golden[:limit] if limit else golden
+    by_id = {i.id: i for i in golden}
+    if unknown := [i for i in rerun_ids if i not in by_id]:
+        raise typer.BadParameter(f"unknown golden ids: {unknown}")
+    items = [by_id[i] for i in rerun_ids] if rerun_ids else (golden[:limit] if limit else golden)
 
-    def render(info: dict) -> list:
-        rows = list(load_done(results_path).values())
-        rescore_numeric(rows, {i.id: i for i in golden})
+    def stored(path: Path) -> list:
+        rows = list(load_done(path).values())
+        rescore_numeric(rows, by_id)
+        return rows
+
+    def render() -> list:
+        full_info = json.loads(full_run.read_text("utf-8"))
+        rows = stored(full_results)
         upsert_section(
-            REPO_ROOT / "docs" / "EVAL.md", ANSWERS_START, ANSWERS_END,
-            render_answers_markdown(info, rows),
-        )  # fmt: skip
+            eval_md, ANSWERS_START, ANSWERS_END, render_answers_markdown(full_info, rows)
+        )
+        if rerun_run.exists():
+            section = render_current_markdown(
+                full_info, json.loads(rerun_run.read_text("utf-8")), rows, stored(rerun_results)
+            )
+            upsert_section(eval_md, CURRENT_START, CURRENT_END, section)
         return rows
 
     if report_only:
-        rows = render(previous)
+        rows = render()
         typer.echo(f"re-rendered {len(rows)} stored answers (no API call)")
         return
 
@@ -231,10 +257,18 @@ def eval_answers(
         "requests": previous.get("requests", 0) + outcome["requests"],
         "failures": previous.get("failures", 0) + outcome["failures"],
     }
-    run_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8", newline="\n")
-    rows = render(info)
+    if rerun_ids:
+        info |= {
+            "ids": rerun_ids,
+            "reason": reason or previous.get("reason", ""),
+            "grade_min_score": settings.grade_min_score,
+        }
+    run_path.write_text(
+        json.dumps(info, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
+    )
+    render()
     typer.echo(json.dumps(info, ensure_ascii=False))
-    typer.echo(f"scored {len(rows)} questions; wrote docs/EVAL.md and {results_path.name}")
+    typer.echo(f"scored {len(load_done(results_path))} questions; wrote docs/EVAL.md")
 
 
 @app.command("eval")

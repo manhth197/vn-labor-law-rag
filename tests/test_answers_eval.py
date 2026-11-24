@@ -12,7 +12,9 @@ from vnlaw_rag.eval.answers import (
     item_key_fact,
     key_fact,
     load_done,
+    merge_rerun,
     render_answers_markdown,
+    render_current_markdown,
     rescore_numeric,
     run_answer_eval,
     score,
@@ -190,13 +192,57 @@ def test_rescore_numeric_uses_the_annotation_without_touching_other_fields():
     assert error_row["numeric_match"] is None  # failed requests stay unscored
 
 
-def test_eval_md_answers_section_matches_the_stored_run():
+def test_eval_md_answers_sections_match_the_stored_runs():
     """The committed report is re-derivable from the committed rows (no API call)."""
     eval_dir = REPO_ROOT / "data" / "eval"
-    run_path = eval_dir / "answer_run.json"
+    run_path, rerun_path = eval_dir / "answer_run.json", eval_dir / "answer_rerun.json"
     if not run_path.exists():
         return
-    rows = list(load_done(eval_dir / "answer_results.jsonl").values())
-    rescore_numeric(rows, {i.id: i for i in load_golden(eval_dir / "golden.jsonl")})
-    section = render_answers_markdown(json.loads(run_path.read_text("utf-8")), rows)
-    assert section in (REPO_ROOT / "docs" / "EVAL.md").read_text(encoding="utf-8")
+    by_id = {i.id: i for i in load_golden(eval_dir / "golden.jsonl")}
+
+    def stored(name):
+        rows = list(load_done(eval_dir / name).values())
+        rescore_numeric(rows, by_id)
+        return rows
+
+    eval_md = (REPO_ROOT / "docs" / "EVAL.md").read_text(encoding="utf-8")
+    info, rows = json.loads(run_path.read_text("utf-8")), stored("answer_results.jsonl")
+    assert render_answers_markdown(info, rows) in eval_md
+    if rerun_path.exists():
+        rerun_info = json.loads(rerun_path.read_text("utf-8"))
+        current = render_current_markdown(info, rerun_info, rows, stored("answer_rerun.jsonl"))
+        assert current in eval_md
+
+
+def test_score_keeps_the_top_similarity():
+    assert score(item(), {**GOOD, "top_score": 0.53712})["top_score"] == 0.537
+    assert "top_score" not in score(item(), GOOD)
+
+
+def test_rerun_replaces_rows_and_reports_both_outcomes():
+    refused = {"status": "not_found", "answer": "Không tìm thấy", "citations": [], "sources": []}
+    base = [
+        score(item(qid="a"), refused),  # stopped at grade: model None
+        score(item(qid="b"), GOOD),
+        score(item(type_="unanswerable", expected=(), qid="u"), refused),
+    ]
+    rerun = [
+        score(item(qid="a"), {**GOOD, "model": "m", "top_score": 0.537}),
+        score(item(type_="unanswerable", expected=(), qid="u"),
+              {**refused, "model": "m", "top_score": 0.501}),
+    ]  # fmt: skip
+    merged = merge_rerun(base, rerun)
+    assert [r["id"] for r in merged] == ["a", "b", "u"]
+    assert merged[0]["status"] == "answered" and merged[1] is base[1]
+
+    base_info = {"date": "2026-11-24", "git": "abc"}
+    rerun_info = {"date": "2026-11-25", "git": "def", "model": "m", "grade_min_score": 0.5,
+                  "ids": ["a", "u"], "reason": "Threshold lowered.", "requests": 3,
+                  "failures": 0, "stopped": None}  # fmt: skip
+    md = render_current_markdown(base_info, rerun_info, base, rerun)
+    assert "| `a` | numeric | 0.537 | refused at `grade`, no LLM call (wrong) |" in md
+    assert "answered, cites BLLD2019/article/25 (right) |" in md
+    assert "| `u` | unanswerable | 0.501 | refused at `grade`, no LLM call (right) | " in md
+    assert "refused by the model (right) |" in md
+    assert "eval-answers --ids a,u" in md and "failed: 0 (0.0%)" in md
+    assert "| Answered (not refused) | 1.000 | 1.000 |" in md  # both answerable now answered

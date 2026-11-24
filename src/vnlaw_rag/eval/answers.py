@@ -172,6 +172,8 @@ def score(item: GoldenItem, out: dict[str, Any]) -> dict[str, Any]:
         "model": out.get("model"),
         "refusal_ok": refused if not item.answerable else not refused,
     }
+    if out.get("top_score") is not None:
+        row["top_score"] = round(float(out["top_score"]), 3)
     if item.answerable and not refused:
         cited = cited_units(out.get("citations", []), out.get("sources", []))
         expected = {r.key() for r in item.expected}
@@ -330,13 +332,11 @@ METRIC_ROWS = [
 
 
 def render_answers_markdown(info: dict[str, Any], rows: list[dict[str, Any]]) -> str:
-    reviewed = summarize_answers([r for r in rows if r.get("reviewed")])
-    everything = summarize_answers(rows)
     requests, failures = info["requests"], info["failures"]
     rate = f"{failures / requests:.1%}" if requests else "n/a"
     lines = [
         ANSWERS_START,
-        "## Answers",
+        "## Answers: full run",
         "",
         f"Run: {info['date']} · git `{info['git']}` · command "
         "`python -m vnlaw_rag.cli eval-answers`",
@@ -356,18 +356,33 @@ def render_answers_markdown(info: dict[str, Any], rows: list[dict[str, Any]]) ->
         "one key figure per question: the item's `key_fact` if annotated, else the first "
         "figure of the reference answer.",
         "",
+    ]
+    lines += _metric_table(rows)
+    lines += ["", "### Errors, wrong refusals and numeric misses", "", *_miss_lines(rows)]
+    lines += ["", "Per-question answers and scores: `data/eval/answer_results.jsonl`.", ANSWERS_END]
+    return "\n".join(lines) + "\n"
+
+
+def _metric_table(rows: list[dict[str, Any]]) -> list[str]:
+    reviewed = summarize_answers([r for r in rows if r.get("reviewed")])
+    everything = summarize_answers(rows)
+    lines = [
         f"| Metric | Reviewed (n={reviewed['n_rows']}) | All (n={everything['n_rows']}) |",
         "|---|---|---|",
     ]
     for label, key, fmt in METRIC_ROWS:
         cells = [fmt.format(s[key]) if s[key] is not None else "-" for s in (reviewed, everything)]
         lines.append(f"| {label} | {cells[0]} | {cells[1]} |")
+    return lines
+
+
+def _miss_lines(rows: list[dict[str, Any]]) -> list[str]:
+    lines: list[str] = []
     misses = [
         r for r in rows
         if r["status"] == "error" or not r.get("refusal_ok", True)
         or (r["type"] == "numeric" and not r.get("numeric_match"))
     ]  # fmt: skip
-    lines += ["", "### Errors, wrong refusals and numeric misses", ""]
     if not misses:
         lines.append("None.")
     for r in misses:
@@ -381,5 +396,78 @@ def render_answers_markdown(info: dict[str, Any], rows: list[dict[str, Any]]) ->
         if r["type"] == "numeric" and not r.get("numeric_match") and r["status"] != "error":
             why.append(f"key figure '{r.get('key_fact')}' missing")
         lines.append(f"- `{r['id']}` ({r['type']}): {'; '.join(why)}")
-    lines += ["", "Per-question answers and scores: `data/eval/answer_results.jsonl`.", ANSWERS_END]
+    return lines
+
+
+# -- targeted re-run under the current configuration ------------------------------------------
+CURRENT_START, CURRENT_END = "<!-- answers-current:start -->", "<!-- answers-current:end -->"
+
+
+def merge_rerun(
+    base_rows: list[dict[str, Any]], rerun_rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """The full run's rows with the re-run questions replaced (order of the full run)."""
+    rerun = {r["id"]: r for r in rerun_rows}
+    merged = [rerun.pop(r["id"], r) for r in base_rows]
+    return merged + list(rerun.values())
+
+
+def _outcome(row: dict[str, Any] | None) -> str:
+    if row is None:
+        return "-"
+    if row["status"] == "error":
+        return "error"
+    verdict = "right" if row.get("refusal_ok") else "wrong"
+    if row["status"] == "answered":
+        cited = ", ".join(row.get("cited_units", [])) or "nothing"
+        return f"answered, cites {cited} ({verdict})"
+    who = "by the model" if row.get("model") else "at `grade`, no LLM call"
+    return f"refused {who} ({verdict})"
+
+
+def render_current_markdown(
+    base_info: dict[str, Any],
+    rerun_info: dict[str, Any],
+    base_rows: list[dict[str, Any]],
+    rerun_rows: list[dict[str, Any]],
+) -> str:
+    ids = rerun_info["ids"]
+    by_id = {r["id"]: r for r in base_rows}
+    done = {r["id"]: r for r in rerun_rows}
+    requests, failures = rerun_info["requests"], rerun_info["failures"]
+    rate = f"{failures / requests:.1%}" if requests else "n/a"
+    lines = [
+        CURRENT_START,
+        "## Answers: current configuration",
+        "",
+        f"The full run below ({base_info['date']}, git `{base_info['git']}`) is kept as history. "
+        f"{rerun_info['reason']} Every other row is taken from the full run.",
+        "",
+        f"- Re-run: {rerun_info['date']} · git `{rerun_info['git']}` · command "
+        f"`python -m vnlaw_rag.cli eval-answers --ids {','.join(ids)}` · generator and judge "
+        f"`{rerun_info['model']}`, `GRADE_MIN_SCORE={rerun_info['grade_min_score']}`.",
+        f"- Questions re-run: {len(done)} of {len(ids)}. API requests: {requests}, "
+        f"failed: {failures} ({rate})"
+        + (f". **Stopped early: {rerun_info['stopped']}**" if rerun_info.get("stopped") else "")
+        + ".",
+        "",
+        "| Question | Type | Top-1 cosine | Full run | Current |",
+        "|---|---|---|---|---|",
+    ]
+    for qid in ids:
+        new = done.get(qid)
+        top = f"{new['top_score']:.3f}" if new and new.get("top_score") is not None else "-"
+        qtype = (new or by_id.get(qid) or {}).get("type", "-")
+        lines.append(
+            f"| `{qid}` | {qtype} | {top} | {_outcome(by_id.get(qid))} | {_outcome(new)} |"
+        )
+    merged = merge_rerun(base_rows, rerun_rows)
+    lines += ["", *_metric_table(merged)]
+    lines += [
+        "",
+        "### Errors, wrong refusals and numeric misses (current)",
+        "",
+        *_miss_lines(merged),
+    ]
+    lines += ["", "Re-run rows: `data/eval/answer_rerun.jsonl`.", CURRENT_END]
     return "\n".join(lines) + "\n"

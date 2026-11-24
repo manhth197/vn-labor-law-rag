@@ -73,8 +73,11 @@ Configuration names: `keyword-bigram-tsrank` = OR of syllable pairs ranked by `t
 - `q046` (paraphrase) Tôi nghỉ làm 5 ngày không xin phép thì có bị đuổi việc không? Expected BLLD2019/article/125; first relevant rank: not in top 10; top 3: ND145/article/65, BLLD2019/article/115, BLLD2019/article/113
 <!-- retrieval:end -->
 
+<!-- answers-current:start -->
+<!-- answers-current:end -->
+
 <!-- answers:start -->
-## Answers
+## Answers: full run
 
 Run: 2026-11-24 · git `830902c` · command `python -m vnlaw_rag.cli eval-answers`
 
