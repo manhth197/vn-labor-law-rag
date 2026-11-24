@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 
 import typer
 
@@ -14,10 +15,16 @@ app = typer.Typer(no_args_is_help=True, add_completion=False, help=__doc__)
 
 @app.callback()
 def main(verbose: bool = typer.Option(False, "--verbose", "-v", help="Debug logging.")) -> None:
+    # Windows consoles and pipes default to a legacy code page; output is Vietnamese.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)s %(name)s: %(message)s",
     )
+    # Request logs from the Hugging Face client are noise at INFO level.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @app.command()
@@ -56,6 +63,118 @@ def parse() -> None:
     n_anomalies = sum(len(v["anomalies"]) for v in info["documents"].values())
     if n_anomalies:
         typer.echo(f"{n_anomalies} parser anomalies: see data/processed/build_info.json")
+
+
+@app.command()
+def index() -> None:
+    """Embed data/processed/chunks.jsonl with bge-m3 and load it into pgvector."""
+    from vnlaw_rag.index.build import build_index
+
+    info = build_index(get_settings())
+    typer.echo(json.dumps(info, ensure_ascii=False, indent=2))
+
+
+@app.command()
+def search(
+    question: str,
+    mode: str = typer.Option("hybrid", help="hybrid | vector | keyword"),
+    top_k: int = typer.Option(8, help="Number of chunks to show."),
+) -> None:
+    """Run retrieval for one question and print the ranked chunks."""
+    from vnlaw_rag.retrieval.factory import open_retriever
+
+    with open_retriever(get_settings(), mode=mode) as retriever:
+        for r in retriever.search(question, top_k=top_k):
+            title = r.row.get("article_title") or r.row.get("appendix_no")
+            typer.echo(
+                f"{r.score:.4f}  {r.chunk_id:<22} v#{r.vector_rank or '-':<3} "
+                f"k#{r.keyword_rank or '-':<3} {title}"
+            )
+
+
+@app.command("eval")
+def eval_retrieval(
+    golden: str = typer.Option("data/eval/golden.jsonl", help="Golden set JSONL."),
+) -> None:
+    """Retrieval eval (no LLM): Hit@k, MRR@10 per configuration -> docs/EVAL.md."""
+
+    from vnlaw_rag.config import REPO_ROOT
+    from vnlaw_rag.eval.report import run_retrieval_eval, write_report
+
+    settings = get_settings()
+    run = run_retrieval_eval(settings, (REPO_ROOT / golden).resolve())
+    write_report(
+        run, REPO_ROOT / "docs" / "EVAL.md", REPO_ROOT / "data" / "eval" / "retrieval_results.json"
+    )
+    for label, summary in run["summary"].items():
+        a = summary["all"]
+        marker = "*" if label == run["default"] else " "
+        typer.echo(
+            f"{marker}{label:<25} hit@1 {a['hit@1']:.3f}  hit@5 {a['hit@5']:.3f}  "
+            f"mrr@10 {a['mrr@10']:.3f}  recall@10 {a['recall@10']:.3f}"
+        )
+    typer.echo("wrote docs/EVAL.md and data/eval/retrieval_results.json")
+
+
+@app.command("review-export")
+def review_export(
+    out: str = typer.Option("data/eval/review-golden.xlsx", help="Workbook to write."),
+    n: int = typer.Option(25, help="Number of questions (stratified by type)."),
+    seed: int = typer.Option(42, help="Sampling seed."),
+) -> None:
+    """Write an Excel workbook for the owner to review a sample of the golden set."""
+    from vnlaw_rag.config import REPO_ROOT
+    from vnlaw_rag.eval.review import export_review
+    from vnlaw_rag.ingest.models import Appendix, Article
+
+    processed = get_settings().processed_dir
+    articles = _read_models(processed / "articles.jsonl", Article)
+    appendices = _read_models(processed / "appendices.jsonl", Appendix)
+    titles = {(a.doc_short, "article", str(a.article_no)): a.article_title for a in articles}
+    titles |= {(p.doc_short, "appendix", p.appendix_no): p.title for p in appendices}
+    # Excerpts keep one clause per line so they are easy to read in Excel.
+    display = {
+        (a.doc_short, "article", str(a.article_no)): f"{a.heading}\n{a.body_text()}"
+        for a in articles
+    }
+    display |= {
+        (p.doc_short, "appendix", p.appendix_no): f"Phụ lục {p.appendix_no}. {p.title}\n{p.text}"
+        for p in appendices
+    }
+    sample = export_review(
+        REPO_ROOT / "data" / "eval" / "golden.jsonl",
+        display,
+        titles,
+        REPO_ROOT / out,
+        n=n,
+        seed=seed,
+    )
+    typer.echo(f"wrote {out} with {len(sample)} questions")
+
+
+@app.command("review-import")
+def review_import(
+    workbook: str = typer.Argument(..., help="Filled workbook (sheet 'Duyệt')."),
+) -> None:
+    """Apply the owner's review (Đúng / Cần sửa / Bỏ) to data/eval/golden.jsonl."""
+    from vnlaw_rag.config import REPO_ROOT
+    from vnlaw_rag.eval.review import import_review
+
+    eval_dir = REPO_ROOT / "data" / "eval"
+    summary = import_review(
+        REPO_ROOT / workbook, eval_dir / "golden.jsonl", eval_dir / "golden_removed.jsonl"
+    )
+    typer.echo(json.dumps(dict(summary.counts), ensure_ascii=False))
+    if summary.edited:
+        typer.echo(
+            f"edited: {', '.join(summary.edited)}; run `pytest tests/test_eval.py` "
+            "to re-check evidence quotes against the corpus"
+        )
+
+
+def _read_models(path, model):
+    with path.open(encoding="utf-8") as fh:
+        return [model.model_validate_json(line) for line in fh if line.strip()]
 
 
 if __name__ == "__main__":

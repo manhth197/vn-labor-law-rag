@@ -1,0 +1,1 @@
+"""Embedding and pgvector storage."""

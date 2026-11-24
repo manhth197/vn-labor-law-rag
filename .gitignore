@@ -22,3 +22,4 @@ data/raw/*.docx
 Thumbs.db
 .vscode/
 .idea/
+data/cache/
