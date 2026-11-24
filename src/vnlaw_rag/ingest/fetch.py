@@ -66,7 +66,10 @@ def fetch_documents(
     """Download every file of `documents` into `raw_dir`, skipping files already present
     with the pinned hash unless `force` is set. Returns the manifest entries written."""
     raw_dir.mkdir(parents=True, exist_ok=True)
-    manifest = load_manifest(manifest_path)
+    documents = list(documents)
+    # Forget files that are no longer sources (e.g. a text replaced by its consolidated one).
+    known = {f.filename for doc in (*DOCUMENTS, *documents) for f in doc.files}
+    manifest = {k: v for k, v in load_manifest(manifest_path).items() if k in known}
     own_client = client is None
     client = client or httpx.Client(
         headers={"User-Agent": user_agent}, timeout=120.0, follow_redirects=True

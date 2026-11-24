@@ -1,0 +1,119 @@
+{
+  "checked_at": "2026-11-24",
+  "amendments": [
+    {
+      "id": "luat-71-2025-qh15",
+      "amending": {
+        "number": "71/2025/QH15",
+        "title": "Luật Công nghiệp công nghệ số",
+        "date": "2025-06-14"
+      },
+      "status": "in_force",
+      "effective_date": "2026-01-01",
+      "in_corpus_text": true,
+      "use_in_answers": true,
+      "summary": "Khoản 4 Điều 49 Luật Công nghiệp công nghệ số bổ sung khoản 8a vào Điều 154 Bộ luật Lao động. Đây là sửa đổi duy nhất trong Văn bản hợp nhất 125/VBHN-VPQH (27/08/2025).",
+      "affects": [
+        {
+          "doc": "BLLD2019",
+          "articles": [154],
+          "clauses": ["8a"],
+          "change": "Khoản 8a được bổ sung: nhân lực công nghiệp công nghệ số chất lượng cao không thuộc diện cấp giấy phép lao động",
+          "mapping": "explicit"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm",
+          "title": "Văn bản hợp nhất số 125/VBHN-VPQH Bộ luật Lao động, chú thích 2 (Công báo số 1309 + 1310 ngày 11/9/2025)",
+          "accessed": "2026-11-24"
+        }
+      ]
+    },
+    {
+      "id": "luat-sua-doi-blld-2026",
+      "amending": {
+        "number": null,
+        "title": "Luật sửa đổi, bổ sung một số điều của Bộ luật Lao động, Luật Lưu trữ, Luật Bình đẳng giới, Luật Hoạt động chữ thập đỏ và Luật Việc làm",
+        "date": "2026-11-21"
+      },
+      "status": "passed_pending_text",
+      "effective_date": "2027-03-01",
+      "in_corpus_text": false,
+      "use_in_answers": true,
+      "summary": "Quốc hội thông qua ngày 21/11/2026 (461/463 đại biểu tán thành), hiệu lực từ 01/3/2027. Với Bộ luật Lao động: cho thuê lại lao động chuyển từ cấp giấy phép sang ký quỹ và thông báo hoạt động; bổ sung Ngày Tổ quốc tri ân - Ngày Thương binh, liệt sĩ (27/7) và Ngày Văn hóa Việt Nam (24/11) là ngày nghỉ lễ hưởng nguyên lương; sửa đổi, bổ sung một số quy định về thương lượng tập thể, Hội đồng tiền lương quốc gia, quản lý lao động, đình công và xử lý cuộc đình công không đúng trình tự, thủ tục. Chưa có số hiệu và toàn văn trên Công báo, nên danh sách Điều dưới đây suy ra từ chủ đề.",
+      "affects": [
+        {
+          "doc": "BLLD2019",
+          "articles": [112],
+          "change": "bổ sung Ngày Tổ quốc tri ân - Ngày Thương binh, liệt sĩ (27/7) và Ngày Văn hóa Việt Nam (24/11) là ngày nghỉ lễ hưởng nguyên lương",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "BLLD2019",
+          "articles": [52, 53, 54, 55, 56, 57, 58],
+          "change": "hoạt động cho thuê lại lao động chuyển từ cấp giấy phép sang ký quỹ và thông báo hoạt động; bên thuê lại phải giám sát việc doanh nghiệp cho thuê lại thực hiện nghĩa vụ với người lao động",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "ND145",
+          "articles": [21, 22, 23, 24, 25, 26, 27, 28, 29],
+          "change": "cơ chế cấp giấy phép hoạt động cho thuê lại lao động được thay bằng ký quỹ và thông báo hoạt động, nên các quy định về giấy phép của Nghị định này có thể không còn áp dụng",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "BLLD2019",
+          "articles": [65, 66, 67, 68, 69, 70, 71, 72, 73, 74],
+          "change": "một số quy định về thương lượng tập thể được sửa đổi, bổ sung",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "BLLD2019",
+          "articles": [92],
+          "change": "quy định về Hội đồng tiền lương quốc gia được sửa đổi, bổ sung",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "ND145",
+          "articles": [49, 50, 51, 52, 53],
+          "change": "quy định của Bộ luật Lao động về Hội đồng tiền lương quốc gia được sửa đổi, bổ sung",
+          "mapping": "inferred_from_topic"
+        },
+        {
+          "doc": "BLLD2019",
+          "articles": [198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211],
+          "change": "một số quy định về đình công và xử lý cuộc đình công không đúng trình tự, thủ tục được sửa đổi, bổ sung",
+          "mapping": "inferred_from_topic"
+        }
+      ],
+      "sources": [
+        {
+          "url": "https://baochinhphu.vn/quoc-hoi-dong-y-bo-sung-2-ngay-nghi-le-duoc-huong-nguyen-luong-102261121121448218.htm",
+          "title": "Báo Chính phủ: Quốc hội đồng ý bổ sung 2 ngày nghỉ lễ được hưởng nguyên lương (21/11/2026)",
+          "accessed": "2026-11-24"
+        }
+      ]
+    },
+    {
+      "id": "du-thao-sua-doi-nd145-2026",
+      "amending": {
+        "number": null,
+        "title": "Dự thảo Nghị định sửa đổi, bổ sung một số điều của Nghị định số 145/2020/NĐ-CP",
+        "date": "2026-07"
+      },
+      "status": "draft",
+      "effective_date": null,
+      "in_corpus_text": false,
+      "use_in_answers": false,
+      "summary": "Dự thảo do Bộ Nội vụ lấy ý kiến tháng 7/2026. Chưa thấy ban hành. Chỉ lưu để theo dõi; không dùng trong câu trả lời.",
+      "affects": [],
+      "sources": [
+        {
+          "url": "https://datafiles.chinhphu.vn/cpp/files/duthaovbpl/2026/Thang7/2.duthaonghidinh.pdf",
+          "title": "Dự thảo Nghị định sửa đổi, bổ sung Nghị định 145/2020/NĐ-CP (Cổng TTĐT Chính phủ, mục lấy ý kiến dự thảo)",
+          "accessed": "2026-11-24"
+        }
+      ]
+    }
+  ]
+}

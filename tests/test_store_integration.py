@@ -46,7 +46,7 @@ def store():
                     sql.Identifier(url.rsplit("/", 1)[1])))  # fmt: skip
     except psycopg.OperationalError as exc:
         pytest.skip(f"no PostgreSQL reachable for integration tests: {exc}")
-    init_database(url, DIM)
+    init_database(url, DIM, reset=True)
     s = PgStore.open(url)
     yield s
     s.close()
@@ -110,6 +110,7 @@ def test_get_chunks_returns_metadata_and_content(store, loaded):
     row = store.get_chunks(["BLLD2019-D25"])["BLLD2019-D25"]
     assert row["article_title"] == "Thời gian thử việc"
     assert row["clause_nos"] == []
+    assert row["amended_by"] == [] and row["upcoming_change"] == []
     assert "Không quá 60 ngày" in row["content"]
 
 

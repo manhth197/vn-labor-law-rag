@@ -54,11 +54,13 @@ _CHUNKS_TABLE = """
       section_title text,
       article_no    int,
       article_title text,
-      clause_nos    int[] NOT NULL DEFAULT ARRAY[]::int[],
+      clause_nos    text[] NOT NULL DEFAULT ARRAY[]::text[],  -- labels: '2', '8a'
       appendix_no   text,
       source_url    text NOT NULL,
       content       text NOT NULL,
       n_tokens      int NOT NULL,
+      amended_by    text[] NOT NULL DEFAULT ARRAY[]::text[],  -- see ingest/amendments.py
+      upcoming_change text[] NOT NULL DEFAULT ARRAY[]::text[],
       embedding     vector({dim}) NOT NULL,
       content_tsv   tsvector GENERATED ALWAYS AS
                     (to_tsvector('vn_unaccent'::regconfig, content)) STORED
@@ -90,6 +92,8 @@ CHUNK_COLUMNS = (
     "appendix_no",
     "source_url",
     "n_tokens",
+    "amended_by",
+    "upcoming_change",
 )
 
 
@@ -103,11 +107,14 @@ class SearchHit:
     rank: int  # 1-based
 
 
-def init_database(database_url: str, dim: int) -> None:
-    """Create extensions, the text search config, tables and indexes (idempotent)."""
+def init_database(database_url: str, dim: int, reset: bool = False) -> None:
+    """Create extensions, the text search config, tables and indexes (idempotent).
+    `reset` drops the chunks table first: a full re-index then also picks up schema changes."""
     with psycopg.connect(database_url, autocommit=True) as conn:
         for statement in _PREPARE:
             conn.execute(statement)
+        if reset:
+            conn.execute("DROP TABLE IF EXISTS chunks")
         conn.execute(sql.SQL(_CHUNKS_TABLE).format(dim=sql.Literal(int(dim))))
         for statement in _FINISH:
             conn.execute(statement)

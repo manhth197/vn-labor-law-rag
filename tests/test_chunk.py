@@ -44,7 +44,7 @@ def test_long_article_is_split_at_clauses_and_repeats_the_lead_in():
     chunks = chunk_article(article, word_count, max_tokens=90)
     ids = [c.chunk_id for c in chunks]
     assert ids == ["BLLD2019-D7-K1-2", "BLLD2019-D7-K3-4", "BLLD2019-D7-K5"]
-    assert [c.clause_nos for c in chunks] == [[1, 2], [3, 4], [5]]
+    assert [c.clause_nos for c in chunks] == [["1", "2"], ["3", "4"], ["5"]]
     for c in chunks:
         assert c.n_tokens <= 90
         lines = c.text.split("\n")

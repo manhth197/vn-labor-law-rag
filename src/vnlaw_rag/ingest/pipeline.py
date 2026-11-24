@@ -21,6 +21,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from vnlaw_rag.config import Settings
+from vnlaw_rag.ingest.amendments import annotate_chunks, corpus_notice, load_registry
 from vnlaw_rag.ingest.chunk import TokenCounter, build_chunks, load_token_counter
 from vnlaw_rag.ingest.models import Line, ParsedDocument
 from vnlaw_rag.ingest.parse import parse_document
@@ -33,12 +34,12 @@ def interim_path(interim_dir: Path, doc: SourceDocument) -> Path:
     return interim_dir / f"{doc.doc_short}.lines.jsonl"
 
 
-def write_jsonl(path: Path, records: Iterable[BaseModel]) -> int:
+def write_jsonl(path: Path, records: Iterable[BaseModel], exclude_defaults: bool = False) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     n = 0
     with path.open("w", encoding="utf-8", newline="\n") as fh:
         for record in records:
-            fh.write(record.model_dump_json() + "\n")
+            fh.write(record.model_dump_json(exclude_defaults=exclude_defaults) + "\n")
             n += 1
     return n
 
@@ -63,7 +64,7 @@ def extract_or_load_lines(doc: SourceDocument, raw_dir: Path, interim_dir: Path)
                 raise
             log.warning("%s; using %s", exc, target)
         else:
-            write_jsonl(target, lines)
+            write_jsonl(target, lines, exclude_defaults=True)  # keep the committed file small
             log.info("%s: extracted %d lines from %d PDF(s)", doc.doc_short, len(lines), len(pdfs))
             return lines
     elif not target.exists():
@@ -93,6 +94,9 @@ def run_parse(
     appendices = [a for p in parsed for a in p.appendices]
     count_tokens = count_tokens or load_token_counter(settings.tokenizer_name)
     chunks = build_chunks(articles, appendices, count_tokens, settings.chunk_max_tokens)
+    registry_path = settings.data_dir / "amendments.json"
+    registry = load_registry(registry_path)
+    annotate_chunks(chunks, registry)
 
     out = settings.processed_dir
     write_jsonl(out / "articles.jsonl", articles)
@@ -104,7 +108,8 @@ def run_parse(
             "tokenizer": settings.tokenizer_name,
             "chunk_max_tokens": settings.chunk_max_tokens,
         },
-        "inputs_sha256": input_hashes,
+        "inputs_sha256": input_hashes | {"amendments.json": _sha256(registry_path)},
+        "corpus_notice": corpus_notice(registry, [d.text_version for d in documents]),
         "documents": {
             p.doc_short: {
                 "articles": len(p.articles),
@@ -115,6 +120,7 @@ def run_parse(
                 ),
                 "appendices": [f"{a.appendix_no} ({a.kind})" for a in p.appendices],
                 "anomalies": [a.model_dump() for a in p.anomalies],
+                "footnotes": p.footnotes,
             }
             for p in parsed
         },
@@ -122,6 +128,8 @@ def run_parse(
             "total": len(chunks),
             "split_articles": sorted({c.chunk_id.split("-K")[0] for c in chunks if c.clause_nos}),
             "max_tokens_observed": max(c.n_tokens for c in chunks),
+            "with_amended_by": sorted(c.chunk_id for c in chunks if c.amended_by),
+            "with_upcoming_change": len([c for c in chunks if c.upcoming_change]),
         },
     }
     (out / "build_info.json").write_text(

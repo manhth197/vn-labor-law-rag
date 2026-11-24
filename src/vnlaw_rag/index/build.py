@@ -1,8 +1,9 @@
 """Build the pgvector index from data/processed/chunks.jsonl (one command, full rebuild).
 
-Embedding 348 chunks with bge-m3 on CPU takes about 10 minutes, so vectors are cached in
-data/cache/ keyed by the chunks file hash and the model name; re-indexing after a schema
-change reuses them. The database is prepared first so a connection problem fails fast.
+Embedding 348 chunks with bge-m3 on CPU takes about 8 minutes, so vectors are cached in
+data/cache/ by the sha256 of each chunk's text (per model and revision): after a corpus
+update only the chunks whose text changed are embedded again. The database is prepared
+first so a connection problem fails fast.
 """
 
 from __future__ import annotations
@@ -30,29 +31,43 @@ def load_chunks(path: Path) -> list[Chunk]:
         return [Chunk.model_validate_json(row) for row in fh if row.strip()]
 
 
-def embedding_cache_path(settings: Settings, chunks_sha256: str) -> Path:
+def text_key(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def embedding_cache_path(settings: Settings) -> Path:
     model = re.sub(r"[^A-Za-z0-9]+", "-", settings.embedding_model).strip("-")
-    revision = settings.embedding_revision[:8]
-    return settings.data_dir / "cache" / f"embeddings-{model}-{revision}-{chunks_sha256[:16]}.npy"
+    return settings.data_dir / "cache" / f"embeddings-{model}-{settings.embedding_revision[:8]}.npz"
+
+
+def load_cache(path: Path) -> dict[str, np.ndarray]:
+    if not path.exists():
+        return {}
+    data = np.load(path)
+    return dict(zip(data["keys"].tolist(), data["vectors"], strict=True))
+
+
+def save_cache(path: Path, cache: dict[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    keys = sorted(cache)
+    np.savez(path, keys=np.array(keys), vectors=np.stack([cache[k] for k in keys]))
 
 
 def build_index(settings: Settings, embeddings: Embeddings | None = None) -> dict:
     chunks_path = settings.processed_dir / "chunks.jsonl"
     chunks = load_chunks(chunks_path)
-    chunks_sha256 = hashlib.sha256(chunks_path.read_bytes()).hexdigest()
 
-    init_database(settings.database_url, settings.embedding_dim)
+    init_database(settings.database_url, settings.embedding_dim, reset=True)  # full rebuild
     store = PgStore.open(settings.database_url)
     try:
-        vectors, embed_seconds = _embed(settings, chunks, chunks_sha256, embeddings)
+        vectors, stats = _embed(settings, chunks, embeddings)
         info = {
             "embedding_model": settings.embedding_model,
             "embedding_revision": settings.embedding_revision,
             "embedding_dim": settings.embedding_dim,
-            "chunks_sha256": chunks_sha256,
+            "chunks_sha256": hashlib.sha256(chunks_path.read_bytes()).hexdigest(),
             "chunks": len(chunks),
-            "embed_seconds": embed_seconds,  # None when vectors came from data/cache
-            "embeddings_source": "cache" if embed_seconds is None else "computed",
+            **stats,
             "indexed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         }
         store.replace_chunks(chunks, vectors, info)
@@ -63,21 +78,32 @@ def build_index(settings: Settings, embeddings: Embeddings | None = None) -> dic
 
 
 def _embed(
-    settings: Settings, chunks: list[Chunk], chunks_sha256: str, embeddings: Embeddings | None
-) -> tuple[np.ndarray, float | None]:
-    cache = embedding_cache_path(settings, chunks_sha256)
-    if embeddings is None and cache.exists():
-        log.info("using cached embeddings %s", cache)
-        return np.load(cache), None
+    settings: Settings, chunks: list[Chunk], embeddings: Embeddings | None
+) -> tuple[np.ndarray, dict]:
+    """Vectors for `chunks`, computing only the texts missing from the cache. A model passed in
+    (tests) bypasses the cache so fake vectors never mix with real ones."""
+    use_cache = embeddings is None
+    path = embedding_cache_path(settings)
+    cache = load_cache(path) if use_cache else {}
+    keys = [text_key(c.text) for c in chunks]
+    missing = [i for i, k in enumerate(keys) if k not in cache]
 
-    model = embeddings or load_embeddings(settings, show_progress=True)
-    started = time.perf_counter()
-    vectors = np.asarray(model.embed_documents([c.text for c in chunks]), dtype=np.float32)
-    seconds = round(time.perf_counter() - started, 1)
-    if vectors.shape != (len(chunks), settings.embedding_dim):
-        raise ValueError(f"expected {len(chunks)}x{settings.embedding_dim}, got {vectors.shape}")
-    log.info("embedded %d chunks in %.1f s", len(chunks), seconds)
-    if embeddings is None:  # only cache the real model's vectors
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        np.save(cache, vectors)
-    return vectors, seconds
+    seconds = 0.0
+    if missing:
+        model = embeddings or load_embeddings(settings, show_progress=True)
+        started = time.perf_counter()
+        new = np.asarray(model.embed_documents([chunks[i].text for i in missing]), dtype=np.float32)
+        seconds = round(time.perf_counter() - started, 1)
+        if new.shape != (len(missing), settings.embedding_dim):
+            raise ValueError(f"expected {len(missing)}x{settings.embedding_dim}, got {new.shape}")
+        cache.update({keys[i]: vec for i, vec in zip(missing, new, strict=True)})
+        log.info("embedded %d of %d chunks in %.1f s", len(missing), len(chunks), seconds)
+        if use_cache:
+            save_cache(path, cache)
+    vectors = np.stack([cache[k] for k in keys]).astype(np.float32)
+    stats = {
+        "embeddings_computed": len(missing),
+        "embeddings_from_cache": len(chunks) - len(missing),
+        "embed_seconds": seconds,
+    }
+    return vectors, stats

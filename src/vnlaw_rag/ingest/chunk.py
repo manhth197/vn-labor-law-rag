@@ -42,7 +42,7 @@ def context_header(doc: SourceDocument, article: Article) -> str:
 class _Unit:
     """A piece of an article body that can be packed into a chunk."""
 
-    clause_no: int
+    clause_no: str  # clause label, e.g. "8a"
     text: str
     tokens: int
     piece: bool = False  # one of several pieces of a clause that was split at its points
@@ -64,7 +64,7 @@ def chunk_article(article: Article, count_tokens: TokenCounter, max_tokens: int)
 
     chunks: list[Chunk] = []
     for group in _pack(units, budget):
-        clause_nos = sorted({u.clause_no for u in group})
+        clause_nos = list(dict.fromkeys(u.clause_no for u in group))  # keep text order
         body = "\n".join(filter(None, [lead, *(u.text for u in group)]))
         heading = f"{article.heading} ({_clause_label(clause_nos)})"
         text = _compose(header, heading, body)
@@ -79,18 +79,21 @@ def _clause_units(clauses: list[Clause], count_tokens: TokenCounter, budget: int
         text = clause_text(clause)
         tokens = count_tokens(text)
         if tokens <= budget or not clause.points:
-            units.append(_Unit(clause.no, text, tokens))
+            units.append(_Unit(clause.label, text, tokens))
             continue
         # Too long on its own: split at point boundaries, repeating the clause's lead text.
-        lead = f"{clause.no}. {clause.text}".rstrip()
+        lead = f"{clause.label}. {clause.text}".rstrip()
         lead_tokens = count_tokens(lead)
         groups = _pack(
-            [_Unit(clause.no, _point_text(p), count_tokens(_point_text(p))) for p in clause.points],
+            [
+                _Unit(clause.label, _point_text(p), count_tokens(_point_text(p)))
+                for p in clause.points
+            ],
             budget - lead_tokens,
         )
         for group in groups:
             text = "\n".join([lead, *(u.text for u in group)])
-            units.append(_Unit(clause.no, text, count_tokens(text), piece=True))
+            units.append(_Unit(clause.label, text, count_tokens(text), piece=True))
     return units
 
 
@@ -127,7 +130,7 @@ def _number_repeated_ids(chunks: list[Chunk]) -> None:
             c.chunk_id = f"{c.chunk_id}-p{seen[c.chunk_id]}"
 
 
-def _clause_label(clause_nos: list[int]) -> str:
+def _clause_label(clause_nos: list[str]) -> str:
     if len(clause_nos) == 1:
         return f"khoản {clause_nos[0]}"
     return f"khoản {clause_nos[0]}-{clause_nos[-1]}"
@@ -141,7 +144,7 @@ def _make_chunk(
     doc: SourceDocument,
     article: Article,
     text: str,
-    clause_nos: list[int],
+    clause_nos: list[str],
     count_tokens: TokenCounter,
 ) -> Chunk:
     chunk_id = f"{doc.doc_short}-D{article.article_no}"

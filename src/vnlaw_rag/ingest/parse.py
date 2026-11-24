@@ -25,6 +25,7 @@ from vnlaw_rag.ingest.models import (
     Line,
     ParsedDocument,
     Point,
+    SourceNote,
 )
 from vnlaw_rag.ingest.sources import SourceDocument
 
@@ -33,7 +34,7 @@ INDENT_MIN_X = 75  # left margin is 64 pt, first-line indent 87 pt
 CHAPTER_RE = re.compile(r"^Chương ([IVXLC]+)$")
 SECTION_RE = re.compile(r"^Mục (\d+)$")
 ARTICLE_RE = re.compile(r"^Điều (\d+)\.\s*(.*)$")
-CLAUSE_RE = re.compile(r"^(\d+)\.\s+(.*)$")
+CLAUSE_RE = re.compile(r"^(\d+)([a-z]?)\.\s+(.*)$")  # "8a." = clause inserted by an amendment
 POINT_RE = re.compile(r"^([a-zđ])\)\s+(.*)$")
 APPENDIX_RE = re.compile(r"^Phụ lục ([IVXLC]+)$")
 FORM_ENTRY_RE = re.compile(r"^Mẫu số (\d+/PL[IVXLC]+)\s*(.*)$")
@@ -50,15 +51,33 @@ class ParseError(ValueError):
 
 def parse_document(lines: list[Line], doc: SourceDocument) -> ParsedDocument:
     body, tail = split_body(lines, doc)
-    builder = _ArticleBuilder(doc)
-    builder.feed(body)
+    # Footnotes (consolidated texts) sit at page bottoms inside the body's reading order: keep
+    # their text by number and take them out of the body.
+    footnotes = collect_footnotes(line for line in body if line.footnote)
+    builder = _ArticleBuilder(doc, footnotes)
+    builder.feed([line for line in body if not line.footnote])
     appendices = parse_appendices(tail, doc)
     return ParsedDocument(
         doc_short=doc.doc_short,
         articles=builder.articles,
         appendices=appendices,
         anomalies=builder.anomalies,
+        footnotes=footnotes,
     )
+
+
+def collect_footnotes(lines: Iterable[Line]) -> dict[str, str]:
+    """A footnote starts at a line carrying its superscript number; following footnote lines
+    without a number continue it."""
+    notes: dict[str, str] = {}
+    current: str | None = None
+    for line in lines:
+        if line.markers:
+            current = line.markers[0]
+            notes[current] = line.text
+        elif current is not None:
+            notes[current] = _join([notes[current], line.text])
+    return notes
 
 
 def split_body(lines: list[Line], doc: SourceDocument) -> tuple[list[Line], list[Line]]:
@@ -99,8 +118,9 @@ def _join(parts: Iterable[str]) -> str:
 
 
 class _ArticleBuilder:
-    def __init__(self, doc: SourceDocument) -> None:
+    def __init__(self, doc: SourceDocument, footnotes: dict[str, str] | None = None) -> None:
         self.doc = doc
+        self.footnotes = footnotes or {}
         self.articles: list[Article] = []
         self.anomalies: list[Anomaly] = []
         self.chapter_seq = 0
@@ -116,13 +136,26 @@ class _ArticleBuilder:
         while i < len(lines):
             line = lines[i]
             in_quote = self.quote_depth > 0 or line.text.startswith(OPEN_QUOTE)
+            if not line.bold and not in_quote and self._unbolded_article_heading(line):
+                # The consolidated text prints the heading of Điều 64 in regular weight. Accept
+                # it only as the next article number on an indented line, and report it.
+                self._anomaly(line, "article heading not bold in the source; accepted")
+                line = line.model_copy(update={"bold": True})
+                lines = [*lines[:i], line, *lines[i + 1 :]]
             if line.bold and not in_quote:
                 consumed = self._heading(lines, i)
                 if consumed:
+                    if ARTICLE_RE.match(line.text):
+                        self._attach_notes(lines[i : i + consumed], clause=None)
+                    # Notes on chapter or section headings concern the document, not an
+                    # article; they stay in ParsedDocument.footnotes.
                     i += consumed
                     continue
                 self._anomaly(line, "bold line that is not a heading; kept as text")
             self._text(line, in_quote)
+            if line.markers and self.articles:
+                clauses = self.articles[-1].clauses
+                self._attach_notes([line], clause=clauses[-1].label if clauses else None)
             self.quote_depth += line.text.count(OPEN_QUOTE) - line.text.count(CLOSE_QUOTE)
             self.quote_depth = max(self.quote_depth, 0)
             i += 1
@@ -174,6 +207,11 @@ class _ArticleBuilder:
             return 1 + n
         return 0
 
+    def _unbolded_article_heading(self, line: Line) -> bool:
+        m = re.match(r"^Điều (\d+)\. \S", line.text)
+        expected = self.articles[-1].article_no + 1 if self.articles else 1
+        return bool(m) and int(m[1]) == expected and line.x0 >= INDENT_MIN_X
+
     @staticmethod
     def _bold_continuation(lines: list[Line], j: int) -> tuple[str, int]:
         """Collect the bold lines that continue a heading's title (titles can wrap)."""
@@ -198,11 +236,13 @@ class _ArticleBuilder:
 
         if indented and not in_quote:
             if m := CLAUSE_RE.match(text):
-                expected = article.clauses[-1].no + 1 if article.clauses else 1
-                if int(m[1]) == expected:
-                    article.clauses.append(Clause(no=expected, text=m[2].strip()))
+                found = (int(m[1]), m[2])
+                allowed = _next_clauses(article.clauses[-1] if article.clauses else None)
+                if found in allowed:
+                    article.clauses.append(Clause(no=found[0], suffix=found[1], text=m[3].strip()))
                     return
-                self._anomaly(line, f"looks like clause {m[1]} but expected {expected}")
+                expected = " or ".join(f"{n}{s}" for n, s in allowed)
+                self._anomaly(line, f"looks like clause {m[1]}{m[2]} but expected {expected}")
             elif m := POINT_RE.match(text):
                 points = article.clauses[-1].points if article.clauses else article.intro_points
                 expected_letter = _next_letter(points[-1].letter if points else None)
@@ -227,6 +267,15 @@ class _ArticleBuilder:
         else:
             article.intro = _concat(article.intro, text, sep)
 
+    def _attach_notes(self, lines: list[Line], clause: str | None) -> None:
+        article = self.articles[-1]
+        for line in lines:
+            for marker in line.markers:
+                if marker in self.footnotes:
+                    article.notes.append(SourceNote(clause=clause, text=self.footnotes[marker]))
+                else:
+                    self._anomaly(line, f"footnote marker {marker} without footnote text")
+
     def _anomaly(self, line: Line, message: str) -> None:
         self.anomalies.append(
             Anomaly(
@@ -242,6 +291,15 @@ class _ArticleBuilder:
 
 def _concat(existing: str, text: str, sep: str) -> str:
     return f"{existing}{sep}{text}" if existing else text
+
+
+def _next_clauses(last: Clause | None) -> list[tuple[int, str]]:
+    """Clause numbers allowed after `last`: the next number, or the next inserted clause
+    (8 -> 8a, 8a -> 8b) that amending laws add without renumbering."""
+    if last is None:
+        return [(1, "")]
+    next_suffix = chr(ord(last.suffix) + 1) if last.suffix else "a"
+    return [(last.no + 1, ""), (last.no, next_suffix)]
 
 
 def _next_letter(letter: str | None) -> str:

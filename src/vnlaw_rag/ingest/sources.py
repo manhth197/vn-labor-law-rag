@@ -3,7 +3,9 @@
 Text source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn. They carry a
 real text layer, while the signed PDFs on vanban.chinhphu.vn are image scans. Texts published
 in Công báo are official and carry the same value as the original document.
-See docs/decisions/001-corpus-source-and-pdf-extraction.md.
+The Labor Code uses its consolidated text (văn bản hợp nhất) 125/VBHN-VPQH, i.e. the law in
+force including amendments up to 27/08/2025; later amendments are tracked in
+data/amendments.json. See docs/decisions/001 and 006.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ class SourceDocument:
     source_url: str  # human-friendly official page, shown in citations
     gazette_url: str
     files: tuple[SourceFile, ...]
+    text_version: str  # which text the corpus holds, shown in the notice and citations
     # Regexes (matched against a stripped line) that mark the end of the normative body:
     # the signature block. Everything after it is appendices or noise.
     body_end_patterns: tuple[str, ...] = field(default_factory=tuple)
@@ -48,17 +51,19 @@ BLLD2019 = SourceDocument(
     doc_type="Bộ luật",
     issued_date="2019-11-20",
     effective_date="2021-01-01",
-    source_url="https://vanban.chinhphu.vn/?pageid=27160&docid=198540",
-    gazette_url="https://congbao.chinhphu.vn/van-ban/nghi-quyet-so-45-2019-qh14-30232.htm",
+    source_url="https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm",
+    gazette_url="https://congbao.chinhphu.vn/van-ban/van-ban-hop-nhat-so-125-vbhn-vpqh-46084.htm",
     files=(
         SourceFile(
-            url="https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2019/11/30232/29070-1-2019993-99445-2019-qh14.pdf",
-            filename="BLLD2019_congbao_993-994.pdf",
-            sha256="3c865f3d92ba23604e316360b902297ddbc0d1c394d3c08a466029a9d43b5b6c",
-            note="Công báo số 993 + 994, ngày 26-12-2019",
+            url="https://congbaocdn.chinhphu.vn/CongBaoCP/VanBan/2025/8/46084/58727-1-20251309-1310125-vbhn-vpqh.pdf",
+            filename="BLLD2019_vbhn125_congbao_1309-1310.pdf",
+            sha256="2c75b7ea41953fd62d8810ae710590f6a0cfed1924aa2f0d116444e99822553f",
+            note="Văn bản hợp nhất 125/VBHN-VPQH (27-8-2025), Công báo số 1309 + 1310, 11-9-2025",
         ),
     ),
-    body_end_patterns=(r"^Bộ luật này được Quốc hội", r"^CHỦ TỊCH QUỐC HỘI$"),
+    text_version="VBHN 125/VBHN-VPQH (2025)",
+    # The consolidated text ends with the National Assembly Office's authentication block.
+    body_end_patterns=(r"^VĂN PHÒNG QUỐC HỘI$", r"^XÁC THỰC VĂN BẢN HỢP NHẤT$"),
 )
 
 ND145 = SourceDocument(
@@ -86,6 +91,7 @@ ND145 = SourceDocument(
             note="Công báo số 1205 + 1206, ngày 28-12-2020 (Điều 102 to Điều 115, appendices)",
         ),
     ),
+    text_version="Nghị định 145/2020/NĐ-CP (văn bản gốc)",
     body_end_patterns=(r"^TM\. CHÍNH PHỦ$",),
 )
 

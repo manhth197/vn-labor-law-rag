@@ -12,6 +12,7 @@ from vnlaw_rag.ingest.pipeline import run_parse
 
 def test_pipeline_runs_from_committed_interim_and_is_deterministic(tmp_path):
     shutil.copytree(INTERIM_DIR, tmp_path / "interim")
+    shutil.copy(REPO_ROOT / "data" / "amendments.json", tmp_path / "amendments.json")
     settings = Settings(data_dir=tmp_path)  # no raw PDFs here: uses the interim lines
 
     info = run_parse(settings, count_tokens=word_count)
@@ -36,7 +37,9 @@ def test_committed_chunks_match_the_architecture_rules():
     assert all(c["n_tokens"] <= 1200 for c in chunks)
     assert len({c["chunk_id"] for c in chunks}) == len(chunks)
     for c in chunks:
-        assert c["source_url"].startswith("https://vanban.chinhphu.vn/")
+        assert c["source_url"].startswith(
+            ("https://vanban.chinhphu.vn/", "https://congbao.chinhphu.vn/")
+        )
         assert c["doc_short"] in {"BLLD2019", "ND145"}
 
 

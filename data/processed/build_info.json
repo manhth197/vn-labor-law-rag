@@ -4,17 +4,33 @@
     "chunk_max_tokens": 1200
   },
   "inputs_sha256": {
-    "BLLD2019": "b01d05b9fdba2773136bdc3ab4228ced85a486ff06b5fff008bbf98e51acfc0e",
-    "ND145": "ab7f754a136eaae9b53594fcafa0f5c6fe999c612ba4496c4048373af78bfc3e"
+    "BLLD2019": "edb8546e607df16dd398d22b5ccd7b6c0e5b586241701eec1bcbcf3d2a7b3371",
+    "ND145": "ab7f754a136eaae9b53594fcafa0f5c6fe999c612ba4496c4048373af78bfc3e",
+    "amendments.json": "d7534bb01703c07677233af3abc78b0fb53d4b02a3346fdc5839661510dcbb17"
   },
+  "corpus_notice": "Theo VBHN 125/VBHN-VPQH (2025), Nghị định 145/2020/NĐ-CP (văn bản gốc); một số quy định sẽ thay đổi từ 01/03/2027.",
   "documents": {
     "BLLD2019": {
       "articles": 220,
       "chapters": 17,
-      "clauses": 638,
-      "points": 267,
+      "clauses": 639,
+      "points": 265,
       "appendices": [],
-      "anomalies": []
+      "anomalies": [
+        {
+          "doc_short": "BLLD2019",
+          "article_no": 63,
+          "page": 30,
+          "part": 0,
+          "message": "article heading not bold in the source; accepted",
+          "text": "Điều 64. Nội dung đối thoại tại nơi làm việc"
+        }
+      ],
+      "footnotes": {
+        "1": "Luật Công nghiệp công nghệ số số 71/2025/QH15 có căn cứ ban hành như sau: “Căn cứ Hiến pháp nước Cộng hòa xã hội chủ nghĩa Việt Nam; Quốc hội ban hành Luật Công nghiệp công nghệ số.”.",
+        "2": "Khoản này được bổ sung theo quy định tại khoản 4 Điều 49 của Luật Công nghiệp công nghệ số số 71/2025/QH15, có hiệu lực kể từ ngày 01 tháng 01 năm 2026.",
+        "3": "Điều 50 của Luật Công nghiệp công nghệ số số 71/2025/QH15, có hiệu lực kể từ ngày 01 tháng 01 năm 2026 quy định như sau: “Điều 50. Hiệu lực thi hành 1. Luật này có hiệu lực thi hành từ ngày 01 tháng 01 năm 2026, trừ trường hợp quy định tại khoản 2 Điều này. 2. Các điều 11, 28 và 29 của Luật này có hiệu lực thi hành từ ngày 01 tháng 7 năm 2025. 3. Trường hợp có quy định khác nhau về cùng một vấn đề giữa Luật này với luật, nghị quyết khác của Quốc hội thì áp dụng quy định của Luật này. Trừ trường hợp văn bản quy phạm pháp luật khác có quy định cơ chế, chính sách ưu đãi hoặc thuận lợi hơn Luật này thì đối tượng được ưu đãi được áp dụng mức ưu đãi có lợi nhất.”."
+      }
     },
     "ND145": {
       "articles": 115,
@@ -29,7 +45,8 @@
         "V (forms)",
         "VI (list)"
       ],
-      "anomalies": []
+      "anomalies": [],
+      "footnotes": {}
     }
   },
   "chunks": {
@@ -41,6 +58,10 @@
       "ND145-D8",
       "ND145-D89"
     ],
-    "max_tokens_observed": 1187
+    "max_tokens_observed": 1187,
+    "with_amended_by": [
+      "BLLD2019-D154"
+    ],
+    "with_upcoming_change": 48
   }
 }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from vnlaw_rag.ingest.parse import POINT_LETTERS
+from vnlaw_rag.ingest.parse import POINT_LETTERS, _next_clauses
 
 ROMAN = [
     "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
@@ -84,7 +84,10 @@ def test_quoted_amendments_are_not_structure(blld):
 
 def test_clauses_and_points_are_sequential_everywhere(blld, nd145):
     for a in blld.articles + nd145.articles:
-        assert [c.no for c in a.clauses] == list(range(1, len(a.clauses) + 1)), a.heading
+        previous = None
+        for clause in a.clauses:
+            assert (clause.no, clause.suffix) in _next_clauses(previous), a.heading
+            previous = clause
         for points in [a.intro_points] + [c.points for c in a.clauses]:
             letters = [p.letter for p in points]
             assert letters == list(POINT_LETTERS[: len(letters)]), a.heading
@@ -99,9 +102,43 @@ def test_point_letter_dd_follows_d(nd145):
     )
 
 
-def test_no_parser_anomalies(blld, nd145):
-    assert blld.anomalies == []
+def test_only_known_parser_anomalies(blld, nd145):
+    # VBHN 125 prints the heading of Điều 64 in regular weight; it is accepted and reported.
+    assert [(a.article_no, a.message) for a in blld.anomalies] == [
+        (63, "article heading not bold in the source; accepted")
+    ]
+    assert blld.anomalies[0].text == "Điều 64. Nội dung đối thoại tại nơi làm việc"
+    assert [a.article_title for a in blld.articles if a.article_no == 64] == [
+        "Nội dung đối thoại tại nơi làm việc"
+    ]
     assert nd145.anomalies == []
+
+
+def test_consolidated_text_inserted_clause_8a(blld):
+    """VBHN 125: khoản 4 Điều 49 Luật 71/2025/QH15 added clause 8a to Điều 154."""
+    a = blld.articles[153]
+    assert a.article_no == 154
+    assert [c.label for c in a.clauses] == ["1", "2", "3", "4", "5", "6", "7", "8", "8a", "9"]
+    clause_8a = a.clauses[8]
+    assert clause_8a.text == (
+        "Nhân lực công nghiệp công nghệ số chất lượng cao theo quy định của pháp luật về "
+        "công nghiệp công nghệ số."
+    )
+    (note,) = a.notes
+    assert note.clause == "8a"
+    assert note.text.startswith("Khoản này được bổ sung theo quy định tại khoản 4 Điều 49")
+    assert "71/2025/QH15" in note.text and "01 tháng 01 năm 2026" in note.text
+
+
+def test_footnotes_are_kept_apart_from_the_text(blld):
+    assert sorted(blld.footnotes) == ["1", "2", "3"]
+    assert [a.article_no for a in blld.articles if a.notes] == [154]
+    for a in blld.articles:  # no footnote text or marker leaked into the body
+        body = a.body_text()
+        assert "Khoản này được bổ sung" not in body, a.heading
+        assert "Luật Công nghiệp công nghệ số số" not in body, a.heading
+    last_chapter = blld.articles[-1]
+    assert (last_chapter.chapter_no, last_chapter.chapter_title) == ("XVII", "ĐIỀU KHOẢN THI HÀNH")
 
 
 def test_decree_has_115_articles(nd145):

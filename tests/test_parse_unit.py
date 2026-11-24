@@ -7,6 +7,7 @@ import dataclasses
 import pytest
 
 from tests.conftest import body, bold, para
+from vnlaw_rag.ingest.models import Line
 from vnlaw_rag.ingest.parse import ParseError, parse_document
 from vnlaw_rag.ingest.sources import BLLD2019
 
@@ -170,3 +171,71 @@ def test_article_numbers_must_be_sequential():
 def test_missing_signature_block_is_an_error():
     with pytest.raises(ParseError, match="end of body"):
         parse_document([bold("Chương I"), bold("A"), bold("Điều 1. A")], DOC)
+
+
+def test_inserted_clauses_follow_their_base_number():
+    result = run(
+        [
+            bold("Chương I"),
+            bold("A"),
+            bold("Điều 1. T"),
+            para("1. Một."),
+            para("1a. Chèn thêm."),
+            para("1b. Chèn tiếp."),
+            para("2. Hai."),
+            para("2b. Sai thứ tự."),
+        ]
+    )
+    a = result.articles[0]
+    assert [c.label for c in a.clauses] == ["1", "1a", "1b", "2"]
+    (anomaly,) = result.anomalies
+    assert "looks like clause 2b" in anomaly.message
+
+
+def test_footnotes_leave_the_body_and_attach_to_their_clause():
+    def note(text, *, markers=()):
+        return Line(
+            page=1, bold=False, x0=87, text=text, part=0, footnote=True, markers=list(markers)
+        )
+
+    result = run(
+        [
+            bold("Chương I"),
+            bold("A"),
+            bold("Điều 1. T"),
+            para("1. Một."),
+            Line(page=1, bold=False, x0=87, text="1a. Chèn thêm.", part=0, markers=["2"]),
+            note("Khoản này được bổ sung theo", markers=["2"]),
+            note("Luật số 1/2025/QH15."),
+            para("2. Hai."),
+        ]
+    )
+    a = result.articles[0]
+    assert [c.label for c in a.clauses] == ["1", "1a", "2"]
+    assert a.clauses[1].text == "Chèn thêm."
+    assert [(n.clause, n.text) for n in a.notes] == [
+        ("1a", "Khoản này được bổ sung theo Luật số 1/2025/QH15.")
+    ]
+    assert result.footnotes == {"2": "Khoản này được bổ sung theo Luật số 1/2025/QH15."}
+    assert "bổ sung" not in a.body_text()
+
+
+def test_unbolded_heading_accepted_only_as_the_next_indented_article():
+    result = run(
+        [
+            bold("Chương I"),
+            bold("A"),
+            bold("Điều 1. Một"),
+            para("Theo quy định tại"),
+            body("Điều 2. của luật khác."),  # not indented: a wrapped line, stays text
+            para("Điều 3. Không phải Điều kế tiếp."),  # wrong number: text
+            para("Điều 2. Hai"),  # next number, indented, regular weight: heading
+            para("Nội dung hai."),
+        ]
+    )
+    assert [a.article_no for a in result.articles] == [1, 2]
+    assert result.articles[1].article_title == "Hai"
+    assert "Điều 3. Không phải Điều kế tiếp." in result.articles[0].intro
+    assert [x.message for x in result.anomalies] == [
+        "article heading not bold in the source; accepted"
+    ]
