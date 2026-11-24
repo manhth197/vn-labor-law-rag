@@ -220,6 +220,17 @@ Client configuration (use absolute paths):
 - **Local demo, not a production service:** one process, no authentication and no rate limiting. The first index embeds on CPU (about 8 minutes).
 - **Language:** answers and UI are in Vietnamese only.
 
+## Future work
+
+- **Reranker** (`BAAI/bge-reranker-v2-m3`) or query rewriting for colloquial questions. Deferred:
+  - only 3 wrong refusals remain, too few to show a gain on this sample;
+  - the reranker needs about 2.3 GB more RAM.
+
+  It needs a larger reviewed golden set first.
+- **Larger reviewed golden set** with more colloquial and keyword-heavy questions, and a judge from another provider (or human grading of a sample).
+- **Amendment registry:** when the law passed on 21/11/2026 is published in Công báo, replace the inferred articles with the exact ones. Move to the next consolidated text when it appears.
+- **Deployment:** authentication and rate limiting before any public deployment.
+
 ## Data layout
 
 | Path | Content | Committed |

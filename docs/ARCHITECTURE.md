@@ -81,4 +81,4 @@ docker-compose.yml  Dockerfile  .github/workflows/ci.yml  .env.example  pyprojec
 | M3 | Graph + generation | LangGraph flow with routing, grading and not-found path; Gemini answers with verified citations; unit tests with a fake LLM | done |
 | M4 | API + UI | FastAPI endpoints incl. SSE streaming; chat UI with citation cards and disclaimer | done (browser-tested in Edge) |
 | M5 | Eval, Docker, CI | Answer eval (approved run) in docs/EVAL.md; `docker compose up` runs everything; CI green | done (CI green on GitHub) |
-| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment | done, plus an MCP server (decision 010); screenshots instead of a demo GIF; the reranker experiment is still open |
+| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment | done, plus an MCP server (decision 010); screenshots instead of a demo GIF; the reranker experiment is deferred (README, Future work) |
