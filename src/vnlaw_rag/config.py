@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -41,6 +42,22 @@ class Settings(BaseSettings):
     retrieval_keyword_k: int = 20
     retrieval_top_k: int = 8
     rrf_k: int = 60
+
+    # LLM (Google Gemini API, free tier). The key is a SecretStr so it never shows up in
+    # logs or reprs; it is read from the environment or .env and never written anywhere.
+    gemini_api_key: SecretStr | None = None
+    # Strongest model in the free tier when checked (2026-11-24); see docs/decisions/007.
+    llm_model: str = "gemini-4-hydrogen"
+    llm_fallback_model: str | None = "gemini-3.8-flash"  # used once if the main one is 429
+    llm_max_sources: int = 6  # retrieved chunks given to the model
+    llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
+    llm_max_output_tokens: int = 2048
+    llm_timeout_seconds: float = 60.0
+    llm_max_attempts: int = 4  # our own retries on 429/5xx, with backoff (see llm/gemini.py)
+    llm_backoff_seconds: float = 5.0
+    # The `grade` node answers "not found" when the best cosine similarity is below this.
+    # From docs/EVAL.md: answerable top-1 min 0.537 / median 0.729; out-of-scope max 0.674.
+    grade_min_score: float = 0.55
 
     @property
     def raw_dir(self) -> Path:

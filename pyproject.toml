@@ -24,6 +24,9 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "psycopg-pool>=3.2",
     "pgvector>=0.3",
+    # Generation
+    "langgraph>=1.2",
+    "google-genai>=2.33",  # Interactions API, see llm/gemini.py
 ]
 
 [project.optional-dependencies]

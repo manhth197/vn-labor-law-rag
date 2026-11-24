@@ -185,6 +185,17 @@ class PgStore:
             rows = cur.execute(query, (list(chunk_ids),)).fetchall()
         return {r["chunk_id"]: r for r in rows}
 
+    def get_article_chunks(self, doc_short: str, article_no: int) -> list[dict[str, Any]]:
+        """All chunks of one article, in text order (for explicit "Điều N" questions)."""
+        columns = sql.SQL(", ").join(sql.Identifier(c) for c in (*CHUNK_COLUMNS, "content"))
+        query = sql.SQL(
+            "SELECT {} FROM chunks WHERE doc_short = %s AND article_no = %s ORDER BY chunk_id"
+        ).format(columns)
+        with self.pool.connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            rows = cur.execute(query, (doc_short, article_no)).fetchall()
+        # chunk ids sort as text ("-K10" < "-K2"); restore clause order from the labels
+        return sorted(rows, key=lambda r: _clause_order(r["clause_nos"]))
+
     def vector_search(self, embedding: Sequence[float], k: int) -> list[SearchHit]:
         query_vec = np.asarray(embedding, dtype=np.float32)
         with self.pool.connection() as conn:
@@ -242,3 +253,11 @@ class PgStore:
         with self.pool.connection() as conn:
             rows = conn.execute(query, params).fetchall()
         return [SearchHit(cid, float(score), i) for i, (cid, score) in enumerate(rows, 1)]
+
+
+def _clause_order(labels: Sequence[str]) -> tuple[int, str]:
+    if not labels:
+        return (0, "")
+    first = labels[0]
+    digits = "".join(ch for ch in first if ch.isdigit())
+    return (int(digits or 0), first[len(digits) :])

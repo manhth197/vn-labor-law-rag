@@ -2,7 +2,7 @@
 
 Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Nghị định 145/2020) with retrieval on PostgreSQL + pgvector, LangGraph orchestration and LLM answers that cite every article and clause.
 
-> Work in progress: milestones M1 (corpus and parsing) and M2 (index and retrieval) are done. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
+> Work in progress: M1 (corpus and parsing), M2 (index and retrieval) and M3 (LangGraph flow with Gemini answers) are done; API/UI next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
 
 **Not legal advice.** Notice shown with answers: *Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.* The Labor Code is the consolidated text 125/VBHN-VPQH (the law in force, including amendments up to 27/08/2025); Nghị định 145/2020/NĐ-CP is the original text. Changes announced after that are tracked in [an amendment registry](#amendments) and flagged on the articles they touch.
 
@@ -36,6 +36,9 @@ python -m vnlaw_rag.cli index      # embed 348 chunks with bge-m3 and load them 
 python -m vnlaw_rag.cli search "Thời gian thử việc tối đa là bao lâu?"
 python -m vnlaw_rag.cli eval       # retrieval metrics -> docs/EVAL.md
 
+# M3: answers (needs GEMINI_API_KEY in .env)
+python -m vnlaw_rag.cli ask "Người lao động được nghỉ Tết Âm lịch mấy ngày?"
+
 pytest                             # offline; DB integration tests skip if no database
 ruff check . && ruff format --check .
 ```
@@ -44,6 +47,7 @@ ruff check . && ruff format --check .
 - `index` downloads bge-m3 once (about 2.3 GB). The model revision is pinned (`EMBEDDING_REVISION`, the Hub's safetensors conversion of the same weights), so only one weight file is cached and offline runs work. Embedding all 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/` by the hash of each chunk's text, so after a corpus update only changed chunks are embedded again (5 chunks, 9.6 s, for the switch to the consolidated text).
 - Use `127.0.0.1` rather than `localhost` in `DATABASE_URL` on Windows: `localhost` tries IPv6 first and the container port is bound to IPv4 only, which costs a connection timeout.
 - Configuration is read from environment variables or `.env` (see `.env.example`).
+- **LLM:** Google Gemini API, free tier, official `google-genai` SDK. Model `gemini-4-hydrogen` (strongest model marked free of charge on 2026-11-24), fallback `gemini-3.8-flash`; change with `LLM_MODEL` / `LLM_FALLBACK_MODEL`. **On the free tier Google may use the requests to improve its products**: the app sends only the question and public legal text; do not type personal data into questions.
 
 ## Retrieval results
 
@@ -66,6 +70,16 @@ python -m vnlaw_rag.cli review-export                      # data/eval/review-go
 python -m vnlaw_rag.cli review-import data/eval/review-golden.xlsx
 pytest tests/test_eval.py                                  # re-checks evidence quotes
 ```
+
+## How a question is answered
+
+LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found) -> finalize`.
+
+- **route**: an explicit reference ("Điều 35", "khoản 2 Điều 113 BLLĐ", "dieu 21 nghi dinh 145") is looked up directly; other questions go to retrieval.
+- **grade**: if the best cosine similarity is below 0.55 the answer is "không tìm thấy" without calling the LLM.
+- **generate**: Gemini returns structured JSON `{answer, citations[chunk_id], sufficient}`. Citations are checked in code against the retrieved chunks; unknown ids are removed and logged. Uncited or insufficient answers become "không tìm thấy".
+- **warnings**: amendment notes of the cited articles (for example "Điều 112 ... Sẽ thay đổi từ 01/03/2027 ...") are attached by code, not left to the model.
+- Details: [decision 007](docs/decisions/007-gemini-generation-and-citation-checks.md). Tests run the whole graph with a fake LLM; CI never calls the API.
 
 ## Data layout
 
@@ -91,6 +105,7 @@ pytest tests/test_eval.py                                  # re-checks evidence 
 - [004 Own pgvector SQL instead of langchain-postgres](docs/decisions/004-own-pgvector-sql-instead-of-langchain-postgres.md)
 - [005 Default retrieval: vector-only, hybrid measured](docs/decisions/005-retrieval-mode-vector-default.md)
 - [006 Consolidated text and amendment registry](docs/decisions/006-consolidated-text-and-amendment-registry.md)
+- [007 Gemini generation, verified citations, code-level warnings](docs/decisions/007-gemini-generation-and-citation-checks.md)
 
 ## Amendments
 
@@ -106,4 +121,4 @@ When the amending law is published in Công báo, its number and exact articles 
 
 ## License
 
-MIT for the code. PyMuPDF (AGPL-3.0) is an optional, offline ingest dependency and is not used by the application.
+MIT ([LICENSE](LICENSE)). PyMuPDF (AGPL-3.0) is used only by the optional, offline ingest step (`pip install -e ".[ingest]"`); the application does not depend on it.

@@ -93,6 +93,32 @@ def search(
             )
 
 
+@app.command()
+def ask(
+    question: str,
+    show_sources: bool = typer.Option(False, help="Print the retrieved chunk ids and scores."),
+) -> None:
+    """Answer one question through the LangGraph flow (calls the Gemini API)."""
+    from vnlaw_rag.graph.build import open_qa
+
+    with open_qa(get_settings()) as qa:
+        out = qa.invoke({"question": question})
+    typer.echo(out["answer"])
+    if out.get("citations"):
+        typer.echo("\nTrích dẫn: " + ", ".join(out["citations"]))
+    for warning in out.get("warnings", []):
+        typer.echo(f"Lưu ý: {warning}")
+    typer.echo(f"\n{out['notice']} Không phải tư vấn pháp lý.")
+    if show_sources:
+        for s in out.get("sources", []):
+            score = s.get("vector_score")
+            typer.echo(f"  {s['chunk_id']:<22} {score if score is None else round(score, 3)}")
+    timings = ", ".join(f"{k} {v} ms" for k, v in out.get("timings_ms", {}).items())
+    typer.echo(f"[{out['status']}; model {out.get('model')}; route {out['route']}; {timings}]")
+    if out.get("dropped_citations"):
+        typer.echo(f"[dropped citations: {', '.join(out['dropped_citations'])}]")
+
+
 @app.command("eval")
 def eval_retrieval(
     golden: str = typer.Option("data/eval/golden.jsonl", help="Golden set JSONL."),
