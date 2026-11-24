@@ -3,20 +3,23 @@
 ## Goal
 A question-answering assistant for Vietnamese labor law. It answers in Vietnamese, grounded only in the official legal text, and cites every claim to the article (Điều) and clause (Khoản). It is a portfolio project that demonstrates RAG engineering end to end: structured ingestion, hybrid retrieval on pgvector, LangGraph orchestration, Claude generation with citations, measurable evaluation, Docker and CI.
 
-Not legal advice: the UI shows a disclaimer.
+Not legal advice: the UI shows a disclaimer that also names the source documents with their numbers and dates and says that later amendments are not reflected.
 
 ## Corpus (v1)
 - Bộ luật Lao động 2019 (Law No. 45/2019/QH14), effective 2021-01-01.
 - Nghị định 145/2020/NĐ-CP (guidance on working conditions and labor relations).
 
-Source: official government portals (vbpl.vn, chinhphu.vn, quochoi.vn). Raw files go to `data/raw/` with `data/raw/manifest.json` (url, retrieved_at, sha256). Vietnamese normative legal documents are not protected by copyright (Law on Intellectual Property, Art. 15), so the text may live in the repo; always link the source. Files over 5 MB are not committed; a fetch script recreates them.
+Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which have a text layer; citations link to the document page on vanban.chinhphu.vn. (vbpl.vn is behind an anti-bot layer and the signed PDFs on vanban.chinhphu.vn are image scans; see `docs/decisions/001-corpus-source-and-pdf-extraction.md`.) Raw files go to `data/raw/` with `data/raw/manifest.json` (url, retrieved_at, sha256). Vietnamese normative legal documents are not protected by copyright (Law on Intellectual Property, Art. 15), so the text may live in the repo; always link the source. PDFs are not committed; `fetch` recreates them.
+
+**Limitation:** the corpus is the original text as promulgated (Bộ luật Lao động 45/2019/QH14 of 20/11/2019; Nghị định 145/2020/NĐ-CP of 14/12/2020). Later amendments are not reflected. The README, this document and the UI disclaimer say so. Future work: move the Labor Code to its consolidated text (125/VBHN-VPQH, 27/08/2025) and check for an amending decree to Nghị định 145.
 
 ## Ingestion pipeline
-1. **Fetch** official text → `data/raw/`.
-2. **Parse** into a structure: Document → Chương → Mục → Điều → Khoản → Điểm. Output `data/processed/articles.jsonl` (one record per Điều, clauses nested).
-3. **Chunk**: one chunk per Điều. If a Điều is longer than about 1,200 tokens, split by Khoản and prefix each part with the Điều heading. Metadata: `doc_id`, `doc_short` (e.g. `BLLD2019`, `ND145`), `chapter`, `article_no`, `article_title`, `clause_no`, `source_url`.
-4. **Embed** with `BAAI/bge-m3` (sentence-transformers, normalized vectors, dim 1024, CPU).
-5. **Store** in PostgreSQL 16 + pgvector (HNSW, cosine), plus Postgres full-text search (`simple` config + `unaccent`) for keyword matching.
+1. **Fetch** official PDFs → `data/raw/` (+ manifest).
+2. **Extract** text lines with a bold flag and x position (PyMuPDF, optional `[ingest]` extra, AGPL, offline only) → `data/interim/<DOC>.lines.jsonl` (committed, so later steps never need PyMuPDF).
+3. **Parse** into a structure: Document → Chương → Mục → Điều → Khoản → Điểm, using bold headings, indentation, sequential numbering and quote tracking (`docs/decisions/002-layout-aware-legal-parser.md`). Output `data/processed/articles.jsonl` (one record per Điều, clauses nested) and `appendices.jsonl` (Phụ lục).
+4. **Chunk**: one chunk per Điều. If a Điều is longer than 1,200 bge-m3 tokens, split by Khoản (greedy packing of consecutive clauses; by Điểm if one clause is still too long) and prefix each part with a context header, the Điều heading and its lead-in (`docs/decisions/003-article-level-chunking.md`). Metadata: `chunk_id`, `doc_short` (e.g. `BLLD2019`, `ND145`), `doc_number`, `chapter_no`, `chapter_title`, `section_no`, `article_no`, `article_title`, `clause_nos`, `source_url`. Output `data/processed/chunks.jsonl` and `build_info.json`.
+5. **Embed** with `BAAI/bge-m3` (sentence-transformers, normalized vectors, dim 1024, CPU).
+6. **Store** in PostgreSQL 16 + pgvector (HNSW, cosine), plus Postgres full-text search (`simple` config + `unaccent`) for keyword matching.
 
 ## Query flow (LangGraph)
 `route → (article_lookup | retrieve) → grade → generate | not_found → format`
@@ -45,7 +48,7 @@ Source: official government portals (vbpl.vn, chinhphu.vn, quochoi.vn). Raw file
 src/vnlaw_rag/
   config.py            # pydantic-settings, reads .env
   cli.py               # Typer: fetch | parse | index | eval | serve
-  ingest/  fetch.py parse.py chunk.py
+  ingest/  sources.py fetch.py pdf_text.py parse.py chunk.py models.py pipeline.py
   index/   embed.py store.py
   retrieval/ hybrid.py rerank.py
   graph/   state.py nodes.py build.py
@@ -53,7 +56,7 @@ src/vnlaw_rag/
   api/     main.py routes.py static/
   eval/    retrieval.py answers.py
 tests/
-data/  raw/ processed/ eval/
+data/  raw/ interim/ processed/ eval/
 docs/  ARCHITECTURE.md EVAL.md decisions/
 docker-compose.yml  Dockerfile  .env.example  pyproject.toml
 ```
