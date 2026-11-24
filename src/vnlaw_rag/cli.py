@@ -158,6 +158,69 @@ def bench_llm(
         )
 
 
+@app.command("eval-answers")
+def eval_answers(
+    pause: float = typer.Option(4.0, help="Seconds between API requests."),
+    limit: int = typer.Option(0, help="Only the first N golden questions (0 = all)."),
+    fresh: bool = typer.Option(False, help="Start over instead of resuming."),
+) -> None:
+    """Answer eval (calls Gemini): citations, refusals, numeric match, LLM judge -> EVAL.md."""
+    from datetime import datetime, timezone
+
+    from vnlaw_rag.config import REPO_ROOT
+    from vnlaw_rag.eval.answers import (
+        ANSWERS_END,
+        ANSWERS_START,
+        RequestLog,
+        load_done,
+        render_answers_markdown,
+        run_answer_eval,
+    )
+    from vnlaw_rag.eval.golden import load_golden
+    from vnlaw_rag.eval.report import git_revision, upsert_section
+    from vnlaw_rag.graph.build import build_graph, make_nodes
+    from vnlaw_rag.llm.gemini import client_from_settings
+    from vnlaw_rag.retrieval.factory import open_retriever
+
+    settings = get_settings()
+    eval_dir = REPO_ROOT / "data" / "eval"
+    results_path, run_path = eval_dir / "answer_results.jsonl", eval_dir / "answer_run.json"
+    if fresh:
+        results_path.unlink(missing_ok=True)
+        run_path.unlink(missing_ok=True)
+    previous = json.loads(run_path.read_text("utf-8")) if run_path.exists() else {}
+    golden = load_golden(eval_dir / "golden.jsonl")
+    items = golden[:limit] if limit else golden
+
+    requests = RequestLog()
+    generator = client_from_settings(settings, for_eval=True, on_attempt=requests)
+    judge = client_from_settings(settings, for_eval=True, on_attempt=requests)
+    with open_retriever(settings) as retriever:
+        graph = build_graph(make_nodes(settings, retriever, generator))
+        outcome = run_answer_eval(items, graph, judge, results_path, requests, pause)
+
+    info = {
+        "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "git": git_revision(),
+        "model": settings.llm_model,
+        "judge_model": settings.llm_model,
+        "pause_s": pause,
+        "golden_n": len(golden),
+        "stopped": outcome["stopped"],
+        # cumulative over resumed runs
+        "requests": previous.get("requests", 0) + outcome["requests"],
+        "failures": previous.get("failures", 0) + outcome["failures"],
+    }
+    run_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8", newline="\n")
+    rows = list(load_done(results_path).values())
+    upsert_section(
+        REPO_ROOT / "docs" / "EVAL.md", ANSWERS_START, ANSWERS_END,
+        render_answers_markdown(info, rows),
+    )  # fmt: skip
+    typer.echo(json.dumps(info, ensure_ascii=False))
+    typer.echo(f"scored {len(rows)} questions; wrote docs/EVAL.md and {results_path.name}")
+
+
 @app.command("eval")
 def eval_retrieval(
     golden: str = typer.Option("data/eval/golden.jsonl", help="Golden set JSONL."),

@@ -90,6 +90,7 @@ class GeminiClient:
         client: Any = None,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        on_attempt: Callable[[str, bool], None] | None = None,
     ) -> None:
         if not models:
             raise ValueError("at least one model is required")
@@ -114,6 +115,7 @@ class GeminiClient:
         self.backoff_seconds = backoff_seconds
         self._sleep = sleep
         self._clock = clock
+        self._on_attempt = on_attempt  # (model, ok) per API request, for eval accounting
 
     @property
     def model(self) -> str:
@@ -141,6 +143,8 @@ class GeminiClient:
             try:
                 text = self._call(model, system, prompt, schema, timeout, on_text)
             except Exception as exc:  # SDK error classes differ by API path; see status_of
+                if self._on_attempt:
+                    self._on_attempt(model, False)
                 if not is_retryable(exc):
                     raise LLMError(
                         f"{model}: {type(exc).__name__} (status {status_of(exc)})"
@@ -162,6 +166,8 @@ class GeminiClient:
                 if delay > 0:
                     self._sleep(delay)
                 continue
+            if self._on_attempt:
+                self._on_attempt(model, True)
             try:
                 return StructuredResult(schema.model_validate_json(text), model, attempt)
             except ValidationError as exc:
@@ -319,7 +325,9 @@ def answer_prefix(partial_json: str) -> str:
     return "".join(out)
 
 
-def client_from_settings(settings, *, for_eval: bool = False) -> GeminiClient:
+def client_from_settings(
+    settings, *, for_eval: bool = False, on_attempt: Callable[[str, bool], None] | None = None
+) -> GeminiClient:
     """The app client (main + fallback model, short time budget) or, `for_eval`, a client that
     only uses the main model and waits longer, so eval numbers belong to one model."""
     key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
@@ -339,4 +347,5 @@ def client_from_settings(settings, *, for_eval: bool = False) -> GeminiClient:
         else settings.llm_deadline_seconds,
         max_attempts=settings.llm_max_attempts,
         backoff_seconds=settings.llm_backoff_seconds,
+        on_attempt=on_attempt,
     )

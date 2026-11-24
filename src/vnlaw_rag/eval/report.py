@@ -215,13 +215,13 @@ def _hit5(result: dict) -> bool:
     return rank is not None and rank <= 5
 
 
-def write_report(run: dict, eval_md: Path, results_json: Path) -> None:
-    section = render_markdown(run)
+def upsert_section(eval_md: Path, start: str, end: str, section: str) -> None:
+    """Replace the text between `start` and `end` markers (or append it), keeping the rest."""
     if eval_md.exists():
         text = eval_md.read_text(encoding="utf-8")
-        if START in text and END in text:
-            before, rest = text.split(START, 1)
-            after = rest.split(END, 1)[1].lstrip("\n")
+        if start in text and end in text:
+            before, rest = text.split(start, 1)
+            after = rest.split(end, 1)[1].lstrip("\n")
             text = before + section + ("\n" + after if after else "")
         else:
             text = text.rstrip() + "\n\n" + section
@@ -231,6 +231,10 @@ def write_report(run: dict, eval_md: Path, results_json: Path) -> None:
             "command and records its date, git revision and configuration.\n\n" + section
         )
     eval_md.write_text(text, encoding="utf-8", newline="\n")
+
+
+def write_report(run: dict, eval_md: Path, results_json: Path) -> None:
+    upsert_section(eval_md, START, END, render_markdown(run))
     payload = {k: v for k, v in run.items() if k != "items"}
     results_json.parent.mkdir(parents=True, exist_ok=True)
     results_json.write_text(
