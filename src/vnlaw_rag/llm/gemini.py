@@ -253,7 +253,7 @@ class GeminiClient:
                 kind = getattr(event, "event_type", None)
                 if kind == "error":
                     error = getattr(event, "error", None)
-                    raise StreamError(str(error), status_of(error) if error else None)
+                    raise StreamError(str(error), stream_error_status(error))
                 if kind == "step.start":
                     step = getattr(event, "step", None)
                     if getattr(step, "type", None) == "model_output":
@@ -275,6 +275,28 @@ def _close(events: Any) -> None:
             close()
         except Exception:  # closing a broken stream must not hide the real error
             log.debug("closing the stream failed", exc_info=True)
+
+
+# Error events carry a text code ("service_unavailable" was seen on 2026-11-24).
+STREAM_ERROR_CODES = {
+    "service_unavailable": 503,
+    "unavailable": 503,
+    "resource_exhausted": 429,
+    "deadline_exceeded": 504,
+    "internal": 500,
+    "invalid_argument": 400,
+    "not_found": 404,
+    "permission_denied": 403,
+}
+
+
+def stream_error_status(error: Any) -> int | None:
+    if error is None:
+        return None
+    status = status_of(error)
+    if status is not None:
+        return status
+    return STREAM_ERROR_CODES.get(str(getattr(error, "code", "")).lower())
 
 
 class AnswerStreamer:

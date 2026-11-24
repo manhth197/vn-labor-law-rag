@@ -10,7 +10,7 @@ The `generate` node must answer in Vietnamese from the retrieved chunks only and
 - **One retry policy:** SDK retries off; ours handles 429/5xx/timeouts and reports which model answered. *Update: the backoff-then-fallback policy was replaced by hard per-call limits and immediate model switching (decision 008).*
 - **Citations are checked in code:** every id in `citations` or inline `[ID]` must belong to the retrieved chunks; others are dropped from the list and the text and logged. An answer with no valid citation, or `sufficient=false`, becomes the fixed "không tìm thấy" answer.
 - **Warnings are code, not prompt:** `amended_by` / `upcoming_change` of the cited chunks are returned as `warnings` (with dates); the prompt also asks the model to mention them.
-- **Not found is two-layer:** `grade` stops before the LLM when the best cosine similarity is under 0.55 (docs/EVAL.md: answerable top-1 min 0.537, median 0.729; out-of-scope max 0.674); between the layers the model's `sufficient` flag decides.
+- **Not found is two-layer:** `grade` stops before the LLM when the best cosine similarity is under 0.55 (docs/EVAL.md: answerable top-1 min 0.537, median 0.729; out-of-scope max 0.674); between the layers the model's `sufficient` flag decides. *Update: lowered to 0.50 after the answer eval (decision 009).*
 - `LLMClient` is a one-method protocol, so Claude or another provider can be added without touching the graph. Tests use a fake LLM; CI never calls the API.
 
 ## Alternatives

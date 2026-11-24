@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import json
 
+from vnlaw_rag.config import REPO_ROOT
 from vnlaw_rag.eval.answers import (
     JudgeScore,
     RequestLog,
     facts,
+    item_key_fact,
     key_fact,
+    load_done,
     render_answers_markdown,
+    rescore_numeric,
     run_answer_eval,
     score,
     summarize_answers,
 )
-from vnlaw_rag.eval.golden import GoldenItem, Ref
+from vnlaw_rag.eval.golden import GoldenItem, Ref, load_golden
 from vnlaw_rag.llm.base import LLMError, RateLimited, StructuredResult
 
 
@@ -161,3 +165,38 @@ def test_summary_and_report():
     assert "same model as the generator" in md
     assert "`n2` (numeric): key figure '60 ngày' missing" in md
     assert "failed: 1 (10.0%)" in md
+
+
+def test_explicit_key_fact_overrides_the_first_figure():
+    per_week = item(answer="Không quá 8 giờ/ngày và không quá 48 giờ trong 01 tuần.")
+    assert item_key_fact(per_week) == ("8", "giờ")
+    per_week.key_fact = "48 giờ"
+    assert item_key_fact(per_week) == ("48", "giờ")
+    per_week.key_fact = "không có số"  # unusable annotation: fall back to the first figure
+    assert item_key_fact(per_week) == ("8", "giờ")
+
+
+def test_rescore_numeric_uses_the_annotation_without_touching_other_fields():
+    golden = item(answer="Không quá 8 giờ/ngày và 48 giờ/tuần.")
+    out = {**GOOD, "answer": "Tối đa 48 giờ trong một tuần [BLLD2019-D25]."}
+    row = score(golden, out)
+    assert row["numeric_match"] is False and row["key_fact"] == "8 giờ"
+    before = {k: v for k, v in row.items() if k not in ("numeric_match", "key_fact")}
+    golden.key_fact = "48 giờ"
+    error_row = {"id": "q1", "status": "error", "numeric_match": None}
+    rescore_numeric([row, error_row], {"q1": golden})
+    assert row["numeric_match"] is True and row["key_fact"] == "48 giờ"
+    assert {k: v for k, v in row.items() if k not in ("numeric_match", "key_fact")} == before
+    assert error_row["numeric_match"] is None  # failed requests stay unscored
+
+
+def test_eval_md_answers_section_matches_the_stored_run():
+    """The committed report is re-derivable from the committed rows (no API call)."""
+    eval_dir = REPO_ROOT / "data" / "eval"
+    run_path = eval_dir / "answer_run.json"
+    if not run_path.exists():
+        return
+    rows = list(load_done(eval_dir / "answer_results.jsonl").values())
+    rescore_numeric(rows, {i.id: i for i in load_golden(eval_dir / "golden.jsonl")})
+    section = render_answers_markdown(json.loads(run_path.read_text("utf-8")), rows)
+    assert section in (REPO_ROOT / "docs" / "EVAL.md").read_text(encoding="utf-8")

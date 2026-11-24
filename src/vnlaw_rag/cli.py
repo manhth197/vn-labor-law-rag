@@ -163,6 +163,9 @@ def eval_answers(
     pause: float = typer.Option(4.0, help="Seconds between API requests."),
     limit: int = typer.Option(0, help="Only the first N golden questions (0 = all)."),
     fresh: bool = typer.Option(False, help="Start over instead of resuming."),
+    report_only: bool = typer.Option(
+        False, help="No API call: re-score stored answers (numeric fields) and re-render."
+    ),
 ) -> None:
     """Answer eval (calls Gemini): citations, refusals, numeric match, LLM judge -> EVAL.md."""
     from datetime import datetime, timezone
@@ -174,6 +177,7 @@ def eval_answers(
         RequestLog,
         load_done,
         render_answers_markdown,
+        rescore_numeric,
         run_answer_eval,
     )
     from vnlaw_rag.eval.golden import load_golden
@@ -192,6 +196,22 @@ def eval_answers(
     golden = load_golden(eval_dir / "golden.jsonl")
     items = golden[:limit] if limit else golden
 
+    def render(info: dict) -> list:
+        rows = list(load_done(results_path).values())
+        rescore_numeric(rows, {i.id: i for i in golden})
+        upsert_section(
+            REPO_ROOT / "docs" / "EVAL.md", ANSWERS_START, ANSWERS_END,
+            render_answers_markdown(info, rows),
+        )  # fmt: skip
+        return rows
+
+    if report_only:
+        rows = render(previous)
+        typer.echo(f"re-rendered {len(rows)} stored answers (no API call)")
+        return
+
+    revision = git_revision()  # the code that runs, taken before anything can change
+
     requests = RequestLog()
     generator = client_from_settings(settings, for_eval=True, on_attempt=requests)
     judge = client_from_settings(settings, for_eval=True, on_attempt=requests)
@@ -201,7 +221,7 @@ def eval_answers(
 
     info = {
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "git": git_revision(),
+        "git": revision,
         "model": settings.llm_model,
         "judge_model": settings.llm_model,
         "pause_s": pause,
@@ -212,11 +232,7 @@ def eval_answers(
         "failures": previous.get("failures", 0) + outcome["failures"],
     }
     run_path.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8", newline="\n")
-    rows = list(load_done(results_path).values())
-    upsert_section(
-        REPO_ROOT / "docs" / "EVAL.md", ANSWERS_START, ANSWERS_END,
-        render_answers_markdown(info, rows),
-    )  # fmt: skip
+    rows = render(info)
     typer.echo(json.dumps(info, ensure_ascii=False))
     typer.echo(f"scored {len(rows)} questions; wrote docs/EVAL.md and {results_path.name}")
 

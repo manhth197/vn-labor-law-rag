@@ -43,6 +43,9 @@ class GoldenItem(BaseModel):
     # correct on `valid_until` (a known amendment takes effect). ISO dates.
     as_of: str | None = None
     valid_until: str | None = None
+    # Key figure for the numeric exact-match metric when the first figure of the reference
+    # answer is not the one asked (e.g. "48 giờ" for a per-week question).
+    key_fact: str | None = None
     reviewed: bool = False
     drafted_by: str = ""
     notes: str | None = None

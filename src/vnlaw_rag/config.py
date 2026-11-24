@@ -63,7 +63,8 @@ class Settings(BaseSettings):
     llm_backoff_seconds: float = 2.0
     # The `grade` node answers "not found" when the best cosine similarity is below this.
     # From docs/EVAL.md: answerable top-1 min 0.537 / median 0.729; out-of-scope max 0.674.
-    grade_min_score: float = 0.55
+    # Was 0.55 until the answer eval refused q052 (0.537) here: see decision 009.
+    grade_min_score: float = 0.50
 
     @property
     def raw_dir(self) -> Path:

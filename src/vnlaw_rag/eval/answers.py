@@ -90,6 +90,29 @@ def key_fact(reference_answer: str) -> tuple[str, str] | None:
     return None
 
 
+def item_key_fact(item: GoldenItem) -> tuple[str, str] | None:
+    """The item's explicit key figure if annotated, else the reference answer's first one."""
+    if item.key_fact:
+        explicit = facts(item.key_fact)
+        if explicit:
+            return explicit[0]
+    return key_fact(item.reference_answer)
+
+
+def rescore_numeric(rows: list[dict[str, Any]], items: dict[str, GoldenItem]) -> None:
+    """Recompute the numeric fields of stored rows (no API call), e.g. after a key-figure
+    annotation was added to the golden set."""
+    for row in rows:
+        item = items.get(row["id"])
+        if item is None or item.type != "numeric" or row["status"] == "error":
+            continue
+        fact = item_key_fact(item)
+        row["key_fact"] = " ".join(fact) if fact else None
+        row["numeric_match"] = (
+            bool(fact) and row["status"] == "answered" and fact in facts(row["answer"])
+        )
+
+
 # -- citations -----------------------------------------------------------------------------
 def cited_units(citations: Iterable[str], sources: Iterable[dict[str, Any]]) -> list[UnitKey]:
     by_id = {s["chunk_id"]: s for s in sources}
@@ -157,7 +180,7 @@ def score(item: GoldenItem, out: dict[str, Any]) -> dict[str, Any]:
         row["precision"] = len(hits) / len(cited) if cited else 0.0
         row["recall"] = len(set(hits)) / len(expected)
     if item.type == "numeric":
-        fact = key_fact(item.reference_answer)
+        fact = item_key_fact(item)
         row["key_fact"] = " ".join(fact) if fact else None
         row["numeric_match"] = bool(fact) and not refused and fact in facts(row["answer"])
     return row
@@ -325,11 +348,13 @@ def render_answers_markdown(info: dict[str, Any], rows: list[dict[str, Any]]) ->
         f"Questions scored: {len(rows)} of {info['golden_n']}"
         + (f". **Stopped early: {info['stopped']}**" if info.get("stopped") else "")
         + ".",
+        *[f"- Note: {note}" for note in info.get("notes", [])],
         "",
         "> **Caveats.** The judge is the same model as the generator, so it may favor its own "
         "answers: the deterministic rows are the main numbers. The golden set was drafted by "
         "the coding agent; the owner reviewed 22 answerable questions. Numeric match checks "
-        "only the first figure of the reference answer.",
+        "one key figure per question: the item's `key_fact` if annotated, else the first "
+        "figure of the reference answer.",
         "",
         f"| Metric | Reviewed (n={reviewed['n_rows']}) | All (n={everything['n_rows']}) |",
         "|---|---|---|",

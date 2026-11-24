@@ -257,3 +257,19 @@ def test_blocking_call_is_cut_at_its_time_limit():
     release.set()
     assert result.model == "fb"
     assert time.monotonic() - started < 2
+
+
+def test_stream_error_text_codes_map_to_http_status():
+    from vnlaw_rag.llm.gemini import stream_error_status
+
+    assert stream_error_status(SimpleNamespace(code="service_unavailable")) == 503
+    assert stream_error_status(SimpleNamespace(code="RESOURCE_EXHAUSTED")) == 429
+    assert stream_error_status(SimpleNamespace(code=503)) == 503
+    assert stream_error_status(SimpleNamespace(code="something_else")) is None
+
+
+def test_quota_error_in_a_stream_becomes_rate_limited():
+    quota = SimpleNamespace(event_type="error", error=SimpleNamespace(code="resource_exhausted"))
+    client, _, _ = make([[quota]] * 3)
+    with pytest.raises(RateLimited):
+        ask(client, on_text=lambda _: None)
