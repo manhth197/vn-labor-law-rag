@@ -48,3 +48,11 @@ def para(text: str, *, page: int = 1, part: int = 0) -> Line:
 
 def bold(text: str, *, page: int = 1, part: int = 0, x0: int = 87) -> Line:
     return Line(page=page, bold=True, x0=x0, text=text, part=part)
+
+
+@pytest.fixture(scope="session")
+def rows():
+    """Real chunks with real amendment annotations, as the database returns them."""
+    from tests.fakes import build_rows
+
+    return build_rows()

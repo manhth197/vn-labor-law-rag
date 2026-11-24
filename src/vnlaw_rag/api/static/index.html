@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trợ lý pháp luật lao động</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>Trợ lý tra cứu pháp luật lao động</h1>
+      <p class="sub">Bộ luật Lao động 2019 và Nghị định 145/2020/NĐ-CP. Mỗi câu trả lời trích dẫn Điều, khoản.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="disclaimer" role="note">
+      <strong>Không phải tư vấn pháp lý.</strong>
+      <span id="notice">Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.</span>
+      Câu hỏi được gửi tới dịch vụ Gemini (gói miễn phí, Google có thể dùng để cải thiện sản phẩm): đừng nhập thông tin cá nhân.
+    </div>
+
+    <section id="chat" aria-live="polite"></section>
+
+    <div class="examples" id="examples">
+      <span>Thử hỏi:</span>
+      <button type="button">Thời gian thử việc tối đa là bao lâu?</button>
+      <button type="button">Người lao động được nghỉ Tết Âm lịch mấy ngày?</button>
+      <button type="button">Công ty giữ bằng đại học bản gốc của tôi có đúng luật không?</button>
+      <button type="button">Điều 35 quy định gì?</button>
+    </div>
+
+    <form id="ask" autocomplete="off">
+      <label for="question" class="sr-only">Câu hỏi</label>
+      <textarea id="question" rows="2" maxlength="500" placeholder="Nhập câu hỏi về luật lao động…" required></textarea>
+      <button type="submit" id="send">Gửi</button>
+    </form>
+    <p class="meta-line" id="status-line"></p>
+  </main>
+
+  <template id="answer-template">
+    <article class="answer">
+      <p class="question"></p>
+      <ol class="progress"></ol>
+      <div class="text"></div>
+      <div class="warnings" hidden>
+        <strong>Lưu ý thay đổi pháp luật</strong>
+        <ul></ul>
+      </div>
+      <div class="sources" hidden>
+        <strong>Nguồn trích dẫn</strong>
+        <div class="cards"></div>
+      </div>
+      <p class="meta"></p>
+    </article>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

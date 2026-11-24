@@ -2,7 +2,7 @@
 
 Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Nghị định 145/2020) with retrieval on PostgreSQL + pgvector, LangGraph orchestration and LLM answers that cite every article and clause.
 
-> Work in progress: M1 (corpus and parsing), M2 (index and retrieval) and M3 (LangGraph flow with Gemini answers) are done; API/UI next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
+> Work in progress: M1 (corpus and parsing), M2 (index and retrieval), M3 (LangGraph flow with Gemini answers) and M4 (API and chat UI) are done; Docker, CI and answer evaluation next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
 
 **Not legal advice.** Notice shown with answers: *Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.* The Labor Code is the consolidated text 125/VBHN-VPQH (the law in force, including amendments up to 27/08/2025); Nghị định 145/2020/NĐ-CP is the original text. Changes announced after that are tracked in [an amendment registry](#amendments) and flagged on the articles they touch.
 
@@ -38,6 +38,9 @@ python -m vnlaw_rag.cli eval       # retrieval metrics -> docs/EVAL.md
 
 # M3: answers (needs GEMINI_API_KEY in .env)
 python -m vnlaw_rag.cli ask "Người lao động được nghỉ Tết Âm lịch mấy ngày?"
+
+# M4: API + chat UI on http://127.0.0.1:8000 (one process; stop it when not in use)
+python -m vnlaw_rag.cli serve
 
 pytest                             # offline; DB integration tests skip if no database
 ruff check . && ruff format --check .
@@ -81,6 +84,20 @@ LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found)
 - **warnings**: amendment notes of the cited articles (for example "Điều 112 ... Sẽ thay đổi từ 01/03/2027 ...") are attached by code, not left to the model.
 - Details: [decision 007](docs/decisions/007-gemini-generation-and-citation-checks.md). Tests run the whole graph with a fake LLM; CI never calls the API.
 
+## API and UI
+
+`python -m vnlaw_rag.cli serve` starts one FastAPI process (bge-m3 and the database pool are loaded once, 2-3 GB of RAM).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | Chat UI (Vietnamese): streamed answer, citation chips that open the cited text and the official link, amendment warnings, model and time, disclaimer |
+| `POST /api/ask` `{question, top_k?}` | JSON: `answer, status, citations, warnings, notice, model, sources, timings_ms` |
+| `GET /api/ask/stream?question=` | Server-Sent Events: `progress` (đang tìm, đã tìm thấy N Điều, đang soạn, chuyển model), `token`, then `result` or `error` |
+| `GET /api/articles/{doc}/{n}` | One article: structure, text, amendment notes |
+| `GET /health` | Status, model, index size, corpus notice |
+
+Latency policy: each Gemini call has a hard 25 s limit; a timeout, 503 or 429 switches to the fallback model at once; the whole answer has a 60 s budget, after which the UI shows a Vietnamese error message. Model latency is measured with `python -m vnlaw_rag.cli bench-llm` (does not load the embedding model); a first attempt on 2026-11-24 met only 503s and timeouts and was cut short by low memory, so no p50/p95 yet ([decision 008](docs/decisions/008-llm-latency-policy-and-streaming.md)).
+
 ## Data layout
 
 | Path | Content | Committed |
@@ -106,6 +123,7 @@ LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found)
 - [005 Default retrieval: vector-only, hybrid measured](docs/decisions/005-retrieval-mode-vector-default.md)
 - [006 Consolidated text and amendment registry](docs/decisions/006-consolidated-text-and-amendment-registry.md)
 - [007 Gemini generation, verified citations, code-level warnings](docs/decisions/007-gemini-generation-and-citation-checks.md)
+- [008 LLM latency policy and streaming](docs/decisions/008-llm-latency-policy-and-streaming.md)
 
 ## Amendments
 

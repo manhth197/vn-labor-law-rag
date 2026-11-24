@@ -32,7 +32,7 @@ Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which 
 
 ## API (FastAPI)
 - `POST /api/ask` `{question, top_k?}` → `{answer, citations[], warnings[], notice, status, sources[], timings_ms, model}`
-- `GET /api/ask/stream?question=...` (Server-Sent Events)
+- `GET /api/ask/stream?question=...` (Server-Sent Events: `progress`, `token`, `result` | `error`)
 - `GET /api/articles/{doc_short}/{article_no}`
 - `GET /health`
 - A static chat UI at `/` (vanilla HTML/JS, Vietnamese). Citations appear as expandable cards with the source text and a link to the official page.
@@ -53,7 +53,7 @@ src/vnlaw_rag/
   retrieval/ hybrid.py rerank.py
   graph/   state.py nodes.py build.py prompts.py references.py
   llm/     base.py gemini.py
-  api/     main.py routes.py static/
+  api/     main.py static/ (index.html app.js style.css)
   eval/    retrieval.py answers.py
 tests/
 data/  raw/ interim/ processed/ eval/

@@ -52,9 +52,13 @@ class Settings(BaseSettings):
     llm_max_sources: int = 6  # retrieved chunks given to the model
     llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
     llm_max_output_tokens: int = 2048
-    llm_timeout_seconds: float = 60.0
-    llm_max_attempts: int = 4  # our own retries on 429/5xx, with backoff (see llm/gemini.py)
-    llm_backoff_seconds: float = 5.0
+    # Latency policy (llm/gemini.py, docs/decisions/008): per-call timeout; on timeout, 5xx or
+    # 429 switch to the fallback model at once; the whole answer has a time budget.
+    llm_timeout_seconds: float = 25.0
+    llm_deadline_seconds: float = 60.0
+    llm_eval_deadline_seconds: float = 180.0  # eval: main model only, may wait longer
+    llm_max_attempts: int = 3
+    llm_backoff_seconds: float = 2.0
     # The `grade` node answers "not found" when the best cosine similarity is below this.
     # From docs/EVAL.md: answerable top-1 min 0.537 / median 0.729; out-of-scope max 0.674.
     grade_min_score: float = 0.55

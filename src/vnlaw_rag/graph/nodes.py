@@ -14,6 +14,8 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any
 
+from langgraph.config import get_stream_writer
+
 from vnlaw_rag.graph.prompts import SYSTEM_PROMPT, GeneratedAnswer, build_prompt
 from vnlaw_rag.graph.references import find_references
 from vnlaw_rag.graph.state import QAState
@@ -67,16 +69,24 @@ class QANodes:
 
     @timed("lookup")
     def lookup(self, state: QAState) -> dict:
+        refs = ", ".join(f"Điều {r['article_no']}" for r in state["refs"])
+        emit({"type": "progress", "stage": "searching", "message": f"Đang tra {refs}…"})
         sources: list[dict[str, Any]] = []
         for ref in state["refs"]:
             for row in self.retriever.store.get_article_chunks(ref["doc_short"], ref["article_no"]):
                 sources.append({**row, "score": None, "vector_score": None})
-        return {"sources": sources[: self.max_sources]}
+        sources = sources[: state.get("top_k") or self.max_sources]
+        emit(found_event(sources))
+        return {"sources": sources}
 
     @timed("retrieve")
     def retrieve(self, state: QAState) -> dict:
-        results = self.retriever.search(state["question"], top_k=self.max_sources)
+        emit({"type": "progress", "stage": "searching", "message": "Đang tìm Điều luật liên quan…"})
+        results = self.retriever.search(
+            state["question"], top_k=state.get("top_k") or self.max_sources
+        )
         sources = [{**r.row, "score": r.score, "vector_score": r.vector_score} for r in results]
+        emit(found_event(sources))
         return {"sources": sources}
 
     @timed("grade")
@@ -93,10 +103,20 @@ class QANodes:
     @timed("generate")
     def generate(self, state: QAState) -> dict:
         sources = state["sources"]
+        emit({"type": "progress", "stage": "generating", "message": "Đang soạn câu trả lời…"})
         result = self.llm.generate_structured(
             system=SYSTEM_PROMPT,
             prompt=build_prompt(state["question"], sources),
             schema=GeneratedAnswer,
+            on_text=lambda text: emit({"type": "token", "text": text}),
+            on_event=lambda event: emit(
+                {
+                    "type": "progress",
+                    **event,
+                    "message": f"Model {event['from']} chậm hoặc quá tải, chuyển sang "
+                    f"{event['to']}…",
+                }
+            ),
         )
         generated = result.value
         allowed = {s["chunk_id"] for s in sources}
@@ -151,6 +171,26 @@ class QANodes:
     @staticmethod
     def after_grade(state: QAState) -> str:
         return "generate" if state["status"] == "answered" else "not_found"
+
+
+def emit(event: dict[str, Any]) -> None:
+    """Send a progress/token event to `graph.stream(..., stream_mode="custom")` consumers;
+    a no-op under `graph.invoke` or outside a graph run."""
+    try:
+        writer = get_stream_writer()
+    except RuntimeError:
+        return
+    writer(event)
+
+
+def found_event(sources: list[dict[str, Any]]) -> dict[str, Any]:
+    units = {(s["doc_short"], s.get("article_no"), s.get("appendix_no")) for s in sources}
+    return {
+        "type": "progress",
+        "stage": "found",
+        "count": len(units),
+        "message": f"Đã tìm thấy {len(units)} Điều/Phụ lục liên quan.",
+    }
 
 
 def amendment_warnings(cited: list[dict[str, Any]]) -> list[str]:

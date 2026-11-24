@@ -119,6 +119,42 @@ def ask(
         typer.echo(f"[dropped citations: {', '.join(out['dropped_citations'])}]")
 
 
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Bind address (0.0.0.0 inside Docker)."),
+    port: int = typer.Option(8000, help="Port."),
+) -> None:
+    """Run the API and the chat UI. One worker: bge-m3 is loaded once (2-3 GB of RAM)."""
+    import uvicorn
+
+    uvicorn.run("vnlaw_rag.api.main:create_app", factory=True, host=host, port=port, workers=1)
+
+
+@app.command("bench-llm")
+def bench_llm(
+    models: str = typer.Option(
+        "gemini-4-hydrogen,gemini-3.8-flash", help="Comma-separated model ids."
+    ),
+    pause: float = typer.Option(4.0, help="Seconds between calls (free-tier per-minute limits)."),
+) -> None:
+    """LLM latency/reliability on 5 reviewed questions per model (5 requests per model)."""
+    from vnlaw_rag.config import REPO_ROOT
+    from vnlaw_rag.eval.latency import run_latency_bench, write_latency
+
+    def show(sample) -> None:  # one line per call as soon as it is measured
+        print(f"  {sample}", flush=True)
+
+    result = run_latency_bench(
+        get_settings(), models.split(","), pause_seconds=pause, on_sample=show
+    )
+    write_latency(result, REPO_ROOT / "data" / "eval" / "llm_latency.json")
+    for model, s in result["summary"].items():
+        typer.echo(
+            f"{model:<20} n {s['n']}  errors {s['errors']}  TTFT p50 {s['ttft_p50_s']} s  "
+            f"total p50 {s['total_p50_s']} s  p95 {s['total_p95_s']} s"
+        )
+
+
 @app.command("eval")
 def eval_retrieval(
     golden: str = typer.Option("data/eval/golden.jsonl", help="Golden set JSONL."),

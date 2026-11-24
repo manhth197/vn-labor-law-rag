@@ -12,6 +12,7 @@ def merge_dicts(left: dict | None, right: dict | None) -> dict:
 
 class QAState(TypedDict, total=False):
     question: str
+    top_k: int | None  # optional per-request number of sources (default: settings)
     route: str  # "lookup" (explicit "Điều N") | "search"
     refs: list[dict[str, Any]]  # explicit references found by the router
     sources: list[dict[str, Any]]  # chunks given to the model: DB row + retrieval scores

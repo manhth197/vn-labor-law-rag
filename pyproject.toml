@@ -27,6 +27,9 @@ dependencies = [
     # Generation
     "langgraph>=1.2",
     "google-genai>=2.33",  # Interactions API, see llm/gemini.py
+    # API
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
