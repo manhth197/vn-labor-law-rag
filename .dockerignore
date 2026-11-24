@@ -1,0 +1,16 @@
+.git
+.venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+.pytest_cache
+.ruff_cache
+data/raw
+data/interim
+data/cache
+data/eval
+docs
+tests
+scripts
+*.xlsx

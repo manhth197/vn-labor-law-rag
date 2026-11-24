@@ -26,7 +26,7 @@ Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which 
 
 - **route**: a regex catches explicit references ("Điều 35", "khoản 2 Điều 113 BLLĐ") and fetches them directly; clearly out-of-scope questions get a polite refusal.
 - **retrieve**: `HybridRetriever` with three modes. Default `vector`: bge-m3 cosine search, keep the top 8 chunks. `hybrid`: vector top 20 + keyword top 20 fused with Reciprocal Rank Fusion (k = 60). The keyword query OR-s adjacent syllable pairs as phrases (`thu <-> viec | ...`), because Vietnamese words are mostly two syllables and a natural question never contains all the words of its answer; terms are weighted by BM25-style IDF computed in SQL. Hybrid did not beat vector-only on the draft golden set, so vector is the default (`docs/decisions/005-retrieval-mode-vector-default.md`, `docs/EVAL.md`). A cross-encoder reranker (`BAAI/bge-reranker-v2-m3`) is a later experiment, kept only if the eval shows a gain.
-- **grade**: if the best cosine similarity is under `GRADE_MIN_SCORE` (0.55, from the score separation in `docs/EVAL.md`), answer "không tìm thấy quy định phù hợp" without calling the LLM.
+- **grade**: if the best cosine similarity is under `GRADE_MIN_SCORE` (0.50, below every answerable question's top-1 score in `docs/EVAL.md`; it was 0.55 until the answer eval, see `docs/decisions/009-answer-evaluation.md`), answer "không tìm thấy quy định phù hợp" without calling the LLM.
 - **generate**: Google Gemini API (free tier, chosen by the owner) through the official `google-genai` SDK (Interactions API), behind a one-method `LLMClient` interface so another provider can be added. Model from config (`LLM_MODEL=gemini-3.5-flash-lite`, fallback `gemini-3.8-flash`, chosen by measurement in `docs/decisions/008-llm-latency-policy-and-streaming.md`). Structured output `{answer, citations[chunk_id], sufficient}`; citations are verified in code against the retrieved chunks; amendment warnings of the cited chunks are attached by code. The system prompt says: answer in Vietnamese, use only the provided sources, cite every claim with Điều/khoản and the chunk id, mention amendment notes with their dates, say clearly when the sources are not enough. See `docs/decisions/007-gemini-generation-and-citation-checks.md`.
 - LangChain provides the HuggingFace embeddings wrapper (`langchain-huggingface`), `Document` and the retriever interface: `HybridRetriever(BaseRetriever)` wraps our pgvector SQL and plugs into the LangGraph `retrieve` node. `langchain-postgres` was evaluated and not used (shared-state bug in its hybrid search, AND-only keyword query, Windows event-loop issue; see `docs/decisions/004-own-pgvector-sql-instead-of-langchain-postgres.md`). LangGraph provides the state graph.
 
@@ -62,8 +62,8 @@ docker-compose.yml  Dockerfile  .env.example  pyproject.toml
 ```
 
 ## Ops
-- `docker-compose.yml`: `db` (`pgvector/pgvector:pg16`) and `app` (`python:3.11-slim`, CPU-only PyTorch), plus a volume for the Hugging Face model cache.
-- CI (GitHub Actions): ruff, pytest. Unit tests use a fake embedder and a mocked LLM; integration tests use a pgvector service container. CI never calls paid APIs.
+- `docker-compose.yml`: `db` (`pgvector/pgvector:pg16`, 127.0.0.1:5442) and `app` (`Dockerfile`: `python:3.11-slim`, CPU-only PyTorch, non-root user, healthcheck), a volume for the Hugging Face model cache and a bind mount for the embedding cache. The index is built with `docker compose run --rm app python -m vnlaw_rag.cli index`.
+- CI (GitHub Actions, `.github/workflows/ci.yml`): ruff and pytest on Python 3.10/3.11 with a pgvector service container for the integration tests. Unit tests use a fake embedder and a fake LLM. CI never calls paid or rate-limited APIs.
 - Deployment: a later phase (options: an AWS EC2 host shared with the CRM project, or Hugging Face Spaces + managed Postgres).
 
 ## Milestones

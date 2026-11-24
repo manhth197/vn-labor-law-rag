@@ -2,7 +2,7 @@
 
 Question answering over Vietnamese labor law (Bộ luật Lao động 2019, Nghị định 145/2020) with retrieval on PostgreSQL + pgvector, LangGraph orchestration and LLM answers that cite every article and clause.
 
-> Work in progress: M1 (corpus and parsing), M2 (index and retrieval), M3 (LangGraph flow with Gemini answers) and M4 (API and chat UI) are done; Docker, CI and answer evaluation next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
+> Work in progress: M1 (corpus and parsing), M2 (index and retrieval), M3 (LangGraph flow with Gemini answers), M4 (API and chat UI) and M5 (answer evaluation, Docker, CI) are done; M6 (polish) next. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design and milestones.
 
 **Not legal advice.** Notice shown with answers: *Theo VBHN 125/VBHN-VPQH (2025); một số quy định sẽ thay đổi từ 01/03/2027.* The Labor Code is the consolidated text 125/VBHN-VPQH (the law in force, including amendments up to 27/08/2025); Nghị định 145/2020/NĐ-CP is the original text. Changes announced after that are tracked in [an amendment registry](#amendments) and flagged on the articles they touch.
 
@@ -74,12 +74,26 @@ python -m vnlaw_rag.cli review-import data/eval/review-golden.xlsx
 pytest tests/test_eval.py                                  # re-checks evidence quotes
 ```
 
+## Answer results
+
+`python -m vnlaw_rag.cli eval-answers` (2026-11-24, git 830902c): generator and judge `gemini-3.5-flash-lite`, sequential, 148 API requests, 11 failed (7.4%), all 77 questions scored. Deterministic metrics are the main numbers; the LLM judge is the same model as the generator, so its scores are a sanity check only.
+
+| Metric | Reviewed (n=22) | All (n=77) |
+|---|---|---|
+| Answered (answerable questions) | 0.864 | 0.940 |
+| Citation precision / recall (article level) | 0.974 / 0.947 | 0.947 / 0.976 |
+| Numeric exact match (key figure) | 7/8 | 22/23 |
+| Out-of-scope questions refused | - | 10/10 |
+| Judge correctness / faithfulness, 1-5 (secondary) | 5.00 / 4.95 | 4.94 / 4.97 |
+
+All 4 wrong refusals are retrieval misses (the right article was ranked too low or not found) and the answer was "không tìm thấy" instead of a guess (3 refused by the model, 1 stopped by the similarity threshold). Post-run changes (grade threshold 0.55 -> 0.50, one key-figure annotation) are listed in [docs/EVAL.md](docs/EVAL.md) and [decision 009](docs/decisions/009-answer-evaluation.md).
+
 ## How a question is answered
 
 LangGraph flow: `route -> (lookup | retrieve) -> grade -> (generate | not_found) -> finalize`.
 
 - **route**: an explicit reference ("Điều 35", "khoản 2 Điều 113 BLLĐ", "dieu 21 nghi dinh 145") is looked up directly; other questions go to retrieval.
-- **grade**: if the best cosine similarity is below 0.55 the answer is "không tìm thấy" without calling the LLM.
+- **grade**: if the best cosine similarity is below 0.50 the answer is "không tìm thấy" without calling the LLM.
 - **generate**: Gemini returns structured JSON `{answer, citations[chunk_id], sufficient}`. Citations are checked in code against the retrieved chunks; unknown ids are removed and logged. Uncited or insufficient answers become "không tìm thấy".
 - **warnings**: amendment notes of the cited articles (for example "Điều 112 ... Sẽ thay đổi từ 01/03/2027 ...") are attached by code, not left to the model.
 - Details: [decision 007](docs/decisions/007-gemini-generation-and-citation-checks.md). Tests run the whole graph with a fake LLM; CI never calls the API.
@@ -105,6 +119,19 @@ Model choice, measured with `python -m vnlaw_rag.cli bench-llm` (5 reviewed ques
 | ![answer](docs/screenshots/1-answer.png) | ![holiday](docs/screenshots/2-holiday-warning.png) | ![out of scope](docs/screenshots/3-out-of-scope.png) |
 
 Screenshots taken in Microsoft Edge with `scripts/screenshots.py` (Playwright, system browser, no download) against a local server; answers took 2.3 s, 1.4 s and 0.1 s.
+
+## Docker and CI
+
+```bash
+docker compose up -d --build                                   # db + app on http://127.0.0.1:8000
+docker compose run --rm app python -m vnlaw_rag.cli index      # once: load the chunks into pgvector
+```
+
+- The image (`python:3.11-slim`, CPU-only PyTorch) holds the code and `data/processed`; bge-m3 is downloaded on first start into the `hf-cache` volume (2.2 GB), and `./data/cache` is mounted so re-indexing reuses the embeddings.
+- `GEMINI_API_KEY` comes from `.env` (optional file; without a key the app still serves retrieval and article lookups, and questions return an error message).
+- The app container is limited to 4 GB of RAM. Checked on 2026-11-24 (Docker Desktop, WSL2): image 2.16 GB; the index loaded 348 chunks from the embedding cache without loading bge-m3; `/health` answered 15 s after start, with the container at 831 MiB; the Linux image passed the 133 tests against the compose database.
+- That check reused an existing bge-m3 download instead of the volume: mount the model folder read-only and set `HF_HUB_OFFLINE=1` in a compose override (`- ~/.cache/huggingface/hub/models--BAAI--bge-m3:/models/hf/hub/models--BAAI--bge-m3:ro`).
+- **CI** (`.github/workflows/ci.yml`): ruff and pytest on Python 3.10 and 3.11, with a `pgvector/pgvector:pg16` service container for the integration tests. Tests use a fake LLM and fake embeddings: CI never calls the Gemini API and never downloads bge-m3.
 
 ## Data layout
 
@@ -132,6 +159,7 @@ Screenshots taken in Microsoft Edge with `scripts/screenshots.py` (Playwright, s
 - [006 Consolidated text and amendment registry](docs/decisions/006-consolidated-text-and-amendment-registry.md)
 - [007 Gemini generation, verified citations, code-level warnings](docs/decisions/007-gemini-generation-and-citation-checks.md)
 - [008 LLM latency policy and streaming](docs/decisions/008-llm-latency-policy-and-streaming.md)
+- [009 Answer evaluation: deterministic metrics first, LLM judge second](docs/decisions/009-answer-evaluation.md)
 
 ## Amendments
 

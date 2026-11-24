@@ -45,6 +45,8 @@ def store():
                 conn.execute(sql.SQL("CREATE DATABASE {}").format(
                     sql.Identifier(url.rsplit("/", 1)[1])))  # fmt: skip
     except psycopg.OperationalError as exc:
+        if os.environ.get("REQUIRE_INTEGRATION"):  # CI: a missing database is a failure
+            raise
         pytest.skip(f"no PostgreSQL reachable for integration tests: {exc}")
     init_database(url, DIM, reset=True)
     s = PgStore.open(url)

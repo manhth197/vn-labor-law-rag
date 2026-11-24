@@ -1,4 +1,6 @@
-# Local development stack. M2: database only; the app service is added in M5.
+# Whole stack: `docker compose up -d` (db + app on http://127.0.0.1:8000).
+# First start: build the index once (embeddings are cached in ./data/cache when present):
+#   docker compose run --rm app python -m vnlaw_rag.cli index
 # Host port 5442 avoids clashing with other local Postgres instances.
 name: vnlaw-rag
 
@@ -19,5 +21,25 @@ services:
       timeout: 3s
       retries: 20
 
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - path: .env # GEMINI_API_KEY and overrides; optional
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vnlaw}:${POSTGRES_PASSWORD:-vnlaw}@db:5432/${POSTGRES_DB:-vnlaw}
+      DATA_DIR: /app/data
+      HF_HOME: /models/hf
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - hf-cache:/models/hf # bge-m3 weights, downloaded once
+      - ./data/cache:/app/data/cache # chunk embeddings: re-indexing is fast
+    mem_limit: 4g # bge-m3 needs 2-3 GB
+
 volumes:
   pgdata:
+  hf-cache:
