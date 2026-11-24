@@ -74,6 +74,41 @@ Configuration names: `keyword-bigram-tsrank` = OR of syllable pairs ranked by `t
 <!-- retrieval:end -->
 
 <!-- answers-current:start -->
+## Answers: current configuration
+
+The full run below (2026-11-24, git `830902c`) is kept as history. The full run used `GRADE_MIN_SCORE=0.55`; the current setting is 0.50. Only questions whose top-1 cosine lies in [0.50, 0.55) can behave differently (from the recorded retrieval results: q052 and q073), so only they were re-run. Every other row is taken from the full run.
+
+- Re-run: 2026-11-24 · git `aed54ed` · command `python -m vnlaw_rag.cli eval-answers --ids q052,q073` · generator and judge `gemini-3.5-flash-lite`, `GRADE_MIN_SCORE=0.5`.
+- Questions re-run: 2 of 2. API requests: 3, failed: 0 (0.0%).
+
+| Question | Type | Top-1 cosine | Full run | Current |
+|---|---|---|---|---|
+| `q052` | paraphrase | 0.537 | refused at `grade`, no LLM call (wrong) | answered, cites BLLD2019/article/19 (right) |
+| `q073` | unanswerable | 0.501 | refused at `grade`, no LLM call (right) | refused by the model (right) |
+
+| Metric | Reviewed (n=22) | All (n=77) |
+|---|---|---|
+| Answerable questions scored | 22 | 67 |
+| Answered (not refused) | 0.909 | 0.955 |
+| False refusals | 0.091 | 0.045 |
+| Citation precision (article level) | 0.975 | 0.948 |
+| Citation recall (article level) | 0.950 | 0.977 |
+| Cites at least one expected article | 1.000 | 1.000 |
+| Numeric questions | 8 | 23 |
+| Numeric exact match (key figure) | 0.875 | 0.957 |
+| Unanswerable questions | 0 | 10 |
+| Unanswerable correctly refused | - | 1.000 |
+| Judged answers | 20 | 64 |
+| Judge: correctness 1-5 (secondary) | 5.00 | 4.94 |
+| Judge: faithfulness 1-5 (secondary) | 4.95 | 4.97 |
+
+### Errors, wrong refusals and numeric misses (current)
+
+- `q019` (numeric): wrong refusal; key figure '2000000000 đồng' missing
+- `q040` (paraphrase): wrong refusal
+- `q046` (paraphrase): wrong refusal
+
+Re-run rows: `data/eval/answer_rerun.jsonl`.
 <!-- answers-current:end -->
 
 <!-- answers:start -->
@@ -85,7 +120,7 @@ Run: 2026-11-24 · git `830902c` · command `python -m vnlaw_rag.cli eval-answer
 - API requests: 148 (generator + judge), failed: 11 (7.4%). Questions scored: 77 of 77.
 - Note: git: the process ran commit 830902c; the end-of-run value '830902c-dirty' came from edits made to the working tree while it ran (fixed: the revision is now taken at start).
 - Note: q011: key figure annotated as '48 giờ' after the run (the question asks per week; the first-figure rule had picked '8 giờ'); numeric rows re-scored from the stored answers, no API call.
-- Note: After this run GRADE_MIN_SCORE was lowered from 0.55 to 0.50: q052 (answerable, top-1 cosine 0.537, right article at rank 2) was refused by `grade`. Not re-run.
+- Note: After this run GRADE_MIN_SCORE was lowered from 0.55 to 0.50: q052 (answerable, top-1 cosine 0.537, right article at rank 2) was refused by `grade`. q052 and q073 (top-1 in [0.50, 0.55)) were re-run under 0.50: see 'Answers: current configuration'.
 
 > **Caveats.** The judge is the same model as the generator, so it may favor its own answers: the deterministic rows are the main numbers. The golden set was drafted by the coding agent; the owner reviewed 22 answerable questions. Numeric match checks one key figure per question: the item's `key_fact` if annotated, else the first figure of the reference answer.
 
@@ -120,5 +155,5 @@ Per-question answers and scores: `data/eval/answer_results.jsonl`.
 Written by hand from `data/eval/answer_results.jsonl` and the retrieval results above; not generated.
 
 - All 4 wrong refusals come from retrieval, and the model refused rather than invent an answer: `q019` (right article at rank 9; only the top 6 chunks go to the model), `q040` and `q046` (paraphrased questions whose article is not in the top 10), `q052` (top-1 cosine 0.537 under the `grade` threshold 0.55, right article at rank 2).
-- After the run the threshold was lowered to 0.50 (decision 009), so `q052` would now reach the model; not re-run.
+- After the run the threshold was lowered to 0.50 (decision 009). The two questions with a top-1 cosine in [0.50, 0.55) were re-run (3 requests): `q052` is now answered correctly from Điều 19; `q073` (out of scope) now reaches the model, which refuses it. The 3 remaining wrong refusals are all retrieval misses.
 - `q011` was a scoring artifact: the reference starts with the per-day limit (8 giờ) while the question asks per week (48 giờ, which the answer gave). It now carries `key_fact: "48 giờ"`.

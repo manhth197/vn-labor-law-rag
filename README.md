@@ -76,17 +76,17 @@ pytest tests/test_eval.py                                  # re-checks evidence 
 
 ## Answer results
 
-`python -m vnlaw_rag.cli eval-answers` (2026-11-24, git 830902c): generator and judge `gemini-3.5-flash-lite`, sequential, 148 API requests, 11 failed (7.4%), all 77 questions scored. Deterministic metrics are the main numbers; the LLM judge is the same model as the generator, so its scores are a sanity check only.
+`python -m vnlaw_rag.cli eval-answers`, generator and judge `gemini-3.5-flash-lite`, run sequentially. Numbers for the current configuration (`GRADE_MIN_SCORE=0.50`): the full run of 2026-11-24 (git 830902c, 148 API requests, 11 failed = 7.4%, all 77 questions scored) with the 2 questions affected by the later threshold change re-run (git aed54ed, 3 requests, 0 failed). Deterministic metrics are the main numbers; the LLM judge is the same model as the generator, so its scores are a sanity check only.
 
 | Metric | Reviewed (n=22) | All (n=77) |
 |---|---|---|
-| Answered (answerable questions) | 0.864 | 0.940 |
-| Citation precision / recall (article level) | 0.974 / 0.947 | 0.947 / 0.976 |
+| Answered (answerable questions) | 0.909 | 0.955 |
+| Citation precision / recall (article level) | 0.975 / 0.950 | 0.948 / 0.977 |
 | Numeric exact match (key figure) | 7/8 | 22/23 |
 | Out-of-scope questions refused | - | 10/10 |
 | Judge correctness / faithfulness, 1-5 (secondary) | 5.00 / 4.95 | 4.94 / 4.97 |
 
-All 4 wrong refusals are retrieval misses (the right article was ranked too low or not found) and the answer was "không tìm thấy" instead of a guess (3 refused by the model, 1 stopped by the similarity threshold). Post-run changes (grade threshold 0.55 -> 0.50, one key-figure annotation) are listed in [docs/EVAL.md](docs/EVAL.md) and [decision 009](docs/decisions/009-answer-evaluation.md).
+The 3 remaining wrong refusals are retrieval misses (the right article was ranked too low or not found): the model answered "không tìm thấy" instead of guessing. The full run (answered 0.864 / 0.940 under the old 0.55 threshold) and every post-run change are in [docs/EVAL.md](docs/EVAL.md) and [decision 009](docs/decisions/009-answer-evaluation.md).
 
 ## How a question is answered
 

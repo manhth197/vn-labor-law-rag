@@ -1,0 +1,17 @@
+{
+ "date": "2026-11-24",
+ "git": "aed54ed",
+ "model": "gemini-3.5-flash-lite",
+ "judge_model": "gemini-3.5-flash-lite",
+ "pause_s": 4.0,
+ "golden_n": 77,
+ "stopped": null,
+ "requests": 3,
+ "failures": 0,
+ "ids": [
+  "q052",
+  "q073"
+ ],
+ "reason": "The full run used `GRADE_MIN_SCORE=0.55`; the current setting is 0.50. Only questions whose top-1 cosine lies in [0.50, 0.55) can behave differently (from the recorded retrieval results: q052 and q073), so only they were re-run.",
+ "grade_min_score": 0.5
+}

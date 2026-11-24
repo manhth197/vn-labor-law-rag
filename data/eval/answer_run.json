@@ -11,6 +11,6 @@
  "notes": [
   "git: the process ran commit 830902c; the end-of-run value '830902c-dirty' came from edits made to the working tree while it ran (fixed: the revision is now taken at start).",
   "q011: key figure annotated as '48 giờ' after the run (the question asks per week; the first-figure rule had picked '8 giờ'); numeric rows re-scored from the stored answers, no API call.",
-  "After this run GRADE_MIN_SCORE was lowered from 0.55 to 0.50: q052 (answerable, top-1 cosine 0.537, right article at rank 2) was refused by `grade`. Not re-run."
+  "After this run GRADE_MIN_SCORE was lowered from 0.55 to 0.50: q052 (answerable, top-1 cosine 0.537, right article at rank 2) was refused by `grade`. q052 and q073 (top-1 in [0.50, 0.55)) were re-run under 0.50: see 'Answers: current configuration'."
  ]
 }
