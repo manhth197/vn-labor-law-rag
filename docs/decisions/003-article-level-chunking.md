@@ -18,5 +18,5 @@ Legal questions are answered by an article or a clause, and answers must cite th
 
 ## Consequences
 - 348 chunks (335 articles, 5 split into 12 parts, plus 6 appendices); the largest is 1,187 tokens.
-- 1,200 is a starting point from the architecture; M2's retrieval eval can compare smaller limits.
+- 1,200 is a starting point from the architecture. *Update (M6): smaller limits were not compared; it remains an open experiment, after the reranker.*
 - Parsing needs the tokenizer file (downloaded once from Hugging Face); tests use a word counter.

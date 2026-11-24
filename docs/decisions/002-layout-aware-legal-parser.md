@@ -11,7 +11,7 @@ A line-based state machine that uses four signals measured on the Công báo lay
 2. **Indentation** = new paragraph. Body left margin is 64 pt, first-line indent 87 pt. A clause/point marker counts only on an indented line.
 3. **Sequential numbering.** A clause is accepted only if it is the next number, a point only if it is the next letter of the Vietnamese sequence (a, b, c, d, đ, e, g, ...). Articles must be strictly sequential or parsing fails loudly.
 4. **Quotes.** Text inside “...” is never structure.
-Anything that looks like structure but breaks a rule is kept as text and logged as an **anomaly** in `build_info.json` (currently 0). Page headers, page numbers and the signature stamp are dropped by position (top band y < 75 pt). Front matter is skipped up to the first heading of each gazette issue; the body ends at the signature block. Appendices: substantive lists (Phụ lục II, VI of the decree) are kept in full; form collections keep only their table of contents.
+Anything that looks like structure but breaks a rule is kept as text and logged as an **anomaly** in `build_info.json` (0 on the original texts; 1 accepted on the consolidated text, see 006). Page headers, page numbers and the signature stamp are dropped by position (top band y < 75 pt). Front matter is skipped up to the first heading of each gazette issue; the body ends at the signature block. Appendices: substantive lists (Phụ lục II, VI of the decree) are kept in full; form collections keep only their table of contents.
 
 ## Alternatives
 - Regex over plain text only: no bold/indent signal, so wrapped titles and wrapped "N." lines need guesswork.

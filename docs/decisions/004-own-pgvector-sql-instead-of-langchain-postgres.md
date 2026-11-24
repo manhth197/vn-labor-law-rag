@@ -17,5 +17,5 @@ Write the storage layer directly (`index/store.py`, about 150 lines): one `chunk
 
 ## Consequences
 - Full control of the schema and both queries; each retrieval leg can be evaluated on its own (see `docs/EVAL.md`).
-- We maintain the SQL ourselves; integration tests run against a real pgvector database (separate `vnlaw_test` DB, skipped when unreachable).
+- We maintain the SQL ourselves; integration tests run against a real pgvector database (separate `vnlaw_test` DB, skipped locally when unreachable; CI runs them on a pgvector service container and fails if it is missing).
 - The bug report for issue 1 is drafted in `docs/upstream/langchain-postgres-fts-query-leak.md`; filing it is the owner's decision.

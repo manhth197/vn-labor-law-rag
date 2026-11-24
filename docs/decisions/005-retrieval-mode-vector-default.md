@@ -25,3 +25,4 @@ The architecture planned hybrid retrieval: bge-m3 vector search + Postgres full-
 ## Consequences
 - Simpler request path for M3 (one embedding call + one SQL query); explicit article references ("Điều 35") are handled by the router's regex lookup, not by keyword search.
 - Revisit after the owner reviews the golden set: add keyword-heavy questions, then compare weighted RRF and the bge-reranker-v2-m3 cross-encoder (M6).
+- *Update: on the 22 owner-reviewed questions the picture is the same: hybrid Hit@5 0.955 vs 0.909 (one question) but MRR@10 0.829 vs 0.891, so vector stays the default. The answer eval (decision 009) shows the remaining misses are paraphrased questions; the reranker experiment is still open.*

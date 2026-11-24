@@ -1,4 +1,4 @@
-# Vietnamese Labor Law Assistant — Architecture (draft v0.1)
+# Vietnamese Labor Law Assistant — Architecture (v1, as built)
 
 ## Goal
 A question-answering assistant for Vietnamese labor law. It answers in Vietnamese, grounded only in the official legal text, and cites every claim to the article (Điều) and clause (Khoản). It is a portfolio project that demonstrates RAG engineering end to end: structured ingestion, hybrid retrieval on pgvector, LangGraph orchestration, LLM generation (Gemini) with verified citations, measurable evaluation, Docker and CI.
@@ -22,12 +22,13 @@ Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which 
 6. **Store** in PostgreSQL 16 + pgvector with our own SQL (`index/store.py`): one `chunks` table, `vector(1024)` with an HNSW cosine index, and a generated `tsvector` column (`simple` config + `unaccent`) with a GIN index for keyword matching. `python -m vnlaw_rag.cli index` rebuilds it in one command (embeddings are cached in `data/cache/`).
 
 ## Query flow (LangGraph)
-`route → (article_lookup | retrieve) → grade → generate | not_found → format`
+`route → (lookup | retrieve) → grade → (generate | not_found) → finalize`, a LangGraph `StateGraph` (`graph/build.py`). Nodes emit progress events through LangGraph's stream writer; each node's time is recorded in `timings_ms`.
 
-- **route**: a regex catches explicit references ("Điều 35", "khoản 2 Điều 113 BLLĐ") and fetches them directly; clearly out-of-scope questions get a polite refusal.
-- **retrieve**: `HybridRetriever` with three modes. Default `vector`: bge-m3 cosine search, keep the top 8 chunks. `hybrid`: vector top 20 + keyword top 20 fused with Reciprocal Rank Fusion (k = 60). The keyword query OR-s adjacent syllable pairs as phrases (`thu <-> viec | ...`), because Vietnamese words are mostly two syllables and a natural question never contains all the words of its answer; terms are weighted by BM25-style IDF computed in SQL. Hybrid did not beat vector-only on the draft golden set, so vector is the default (`docs/decisions/005-retrieval-mode-vector-default.md`, `docs/EVAL.md`). A cross-encoder reranker (`BAAI/bge-reranker-v2-m3`) is a later experiment, kept only if the eval shows a gain.
+- **route**: a regex catches explicit references ("Điều 35", "khoản 2 Điều 113 BLLĐ", unaccented "dieu 21 nghi dinh 145"); `lookup` then fetches those articles directly. Out-of-scope questions are not detected here: they go through `retrieve` and are stopped by `grade` or by the model's `sufficient` flag.
+- **retrieve**: `HybridRetriever` with three modes. Default `vector`: bge-m3 cosine search, keep the top 6 chunks (`LLM_MAX_SOURCES`). `hybrid`: vector top 20 + keyword top 20 fused with Reciprocal Rank Fusion (k = 60), then the top 6. The keyword query OR-s adjacent syllable pairs as phrases (`thu <-> viec | ...`), because Vietnamese words are mostly two syllables and a natural question never contains all the words of its answer; terms are weighted by BM25-style IDF computed in SQL. Hybrid did not beat vector-only on the draft golden set, so vector is the default (`docs/decisions/005-retrieval-mode-vector-default.md`, `docs/EVAL.md`). A cross-encoder reranker (`BAAI/bge-reranker-v2-m3`) is the next experiment, kept only if the eval shows a gain: the answer eval shows that the remaining wrong refusals are retrieval misses on paraphrased questions.
 - **grade**: if the best cosine similarity is under `GRADE_MIN_SCORE` (0.50, below every answerable question's top-1 score in `docs/EVAL.md`; it was 0.55 until the answer eval, see `docs/decisions/009-answer-evaluation.md`), answer "không tìm thấy quy định phù hợp" without calling the LLM.
-- **generate**: Google Gemini API (free tier, chosen by the owner) through the official `google-genai` SDK (Interactions API), behind a one-method `LLMClient` interface so another provider can be added. Model from config (`LLM_MODEL=gemini-3.5-flash-lite`, fallback `gemini-3.8-flash`, chosen by measurement in `docs/decisions/008-llm-latency-policy-and-streaming.md`). Structured output `{answer, citations[chunk_id], sufficient}`; citations are verified in code against the retrieved chunks; amendment warnings of the cited chunks are attached by code. The system prompt says: answer in Vietnamese, use only the provided sources, cite every claim with Điều/khoản and the chunk id, mention amendment notes with their dates, say clearly when the sources are not enough. See `docs/decisions/007-gemini-generation-and-citation-checks.md`.
+- **generate**: Google Gemini API (free tier, chosen by the owner) through the official `google-genai` SDK (Interactions API), behind a one-method `LLMClient` interface so another provider can be added. Model from config (`LLM_MODEL=gemini-3.5-flash-lite`, fallback `gemini-3.8-flash`, chosen by measurement in `docs/decisions/008-llm-latency-policy-and-streaming.md`). Structured output `{answer, citations[chunk_id], sufficient}`; citations are verified in code against the retrieved chunks; amendment warnings of the cited chunks are attached by code. The system prompt says: answer in Vietnamese, use only the provided sources, cite every claim with Điều/khoản and the chunk id, mention amendment notes with their dates, say clearly when the sources are not enough. In the same node, an answer without a valid citation, or with `sufficient=false`, becomes the fixed "không tìm thấy" answer. See `docs/decisions/007-gemini-generation-and-citation-checks.md`.
+- **finalize**: attaches the corpus notice built from the amendment registry.
 - LangChain provides the HuggingFace embeddings wrapper (`langchain-huggingface`), `Document` and the retriever interface: `HybridRetriever(BaseRetriever)` wraps our pgvector SQL and plugs into the LangGraph `retrieve` node. `langchain-postgres` was evaluated and not used (shared-state bug in its hybrid search, AND-only keyword query, Windows event-loop issue; see `docs/decisions/004-own-pgvector-sql-instead-of-langchain-postgres.md`). LangGraph provides the state graph.
 
 ## API (FastAPI)
@@ -38,27 +39,29 @@ Source: the Official Gazette (Công báo) PDFs on congbaocdn.chinhphu.vn, which 
 - A static chat UI at `/` (vanilla HTML/JS, Vietnamese). Citations appear as expandable cards with the source text and a link to the official page.
 
 ## Evaluation
-- Golden set `data/eval/golden.jsonl`: 60–80 Vietnamese questions with expected article references and a short reference answer. Drafted with LLM help from the articles, then a sample of at least 20 is reviewed by a human (the owner). Mix: direct lookups, paraphrased questions, multi-article questions, numeric facts (annual leave days, retirement age, probation length), and unanswerable or out-of-scope questions.
+- Golden set `data/eval/golden.jsonl`: 77 Vietnamese questions (numeric 23, paraphrase 19, lookup 15, multi 10, unanswerable 10) with expected article references, evidence quotes (checked by a test to occur in the expected articles) and a short reference answer. Drafted by the coding agent; the owner reviewed a stratified sample of 25 through an Excel workbook (`review-export` / `review-import`) and accepted 22.
 - **Retrieval metrics** (no LLM, free): Hit@k, MRR@10, broken down by question type. Re-run after every retrieval change.
-- **Answer metrics**: citation accuracy (cited articles vs. expected), correct refusal on unanswerable questions, and LLM-as-judge scores for faithfulness and correctness. The judge costs money, so it runs manually with the owner's approval and its cost is recorded.
+- **Answer metrics** (`eval-answers`, Gemini free tier, run with the owner's approval): deterministic metrics first (article-level citation precision and recall, refusal correctness, numeric exact match of a key figure); a reference-based LLM judge (1-5 correctness and faithfulness) is secondary because it is the generator model. Sequential requests with stop rules; results in resumable JSONL; `--ids` re-runs selected questions under the current configuration, `--report-only` re-renders without API calls (`docs/decisions/009-answer-evaluation.md`).
+- **LLM latency** (`bench-llm`): success rate, time to first token and total time per model, used to choose the default and fallback models (`docs/decisions/008-llm-latency-policy-and-streaming.md`).
 - Results go to `docs/EVAL.md` with date, git sha and config. No invented numbers.
 
 ## Repo layout
 ```
 src/vnlaw_rag/
   config.py            # pydantic-settings, reads .env
-  cli.py               # Typer: fetch | parse | index | eval | serve
-  ingest/  sources.py fetch.py pdf_text.py parse.py chunk.py models.py pipeline.py
-  index/   embed.py store.py
-  retrieval/ hybrid.py rerank.py
+  cli.py               # Typer: fetch parse index search ask serve eval eval-answers bench-llm review-export review-import
+  ingest/  sources.py fetch.py pdf_text.py parse.py chunk.py models.py pipeline.py amendments.py
+  index/   embed.py store.py build.py
+  retrieval/ hybrid.py keyword.py factory.py
   graph/   state.py nodes.py build.py prompts.py references.py
   llm/     base.py gemini.py
   api/     main.py static/ (index.html app.js style.css)
-  eval/    retrieval.py answers.py
-tests/
-data/  raw/ interim/ processed/ eval/
-docs/  ARCHITECTURE.md EVAL.md decisions/
-docker-compose.yml  Dockerfile  .env.example  pyproject.toml
+  eval/    golden.py retrieval.py report.py review.py latency.py answers.py
+tests/                 # fake LLM and fake embeddings; DB integration tests against pgvector
+scripts/screenshots.py # Playwright with the system Edge
+data/  raw/ interim/ processed/ eval/ amendments.json
+docs/  ARCHITECTURE.md EVAL.md decisions/ screenshots/
+docker-compose.yml  Dockerfile  .github/workflows/ci.yml  .env.example  pyproject.toml
 ```
 
 ## Ops
@@ -67,11 +70,11 @@ docker-compose.yml  Dockerfile  .env.example  pyproject.toml
 - Deployment: a later phase (options: an AWS EC2 host shared with the CRM project, or Hugging Face Spaces + managed Postgres).
 
 ## Milestones
-| # | Milestone | Done when |
-|---|---|---|
-| M1 | Corpus & parsing | Both documents fetched with manifest; parser yields every Điều with correct numbering (tests on real samples); chunks JSONL with metadata |
-| M2 | Index & hybrid retrieval | pgvector + full-text index built by one command; hybrid search with RRF; golden set drafted; retrieval eval script reports Hit@5 / MRR@10 |
-| M3 | Graph + generation | LangGraph flow with routing, grading and not-found path; Gemini answers with verified citations; unit tests with a fake LLM |
-| M4 | API + UI | FastAPI endpoints incl. SSE streaming; chat UI with citation cards and disclaimer |
-| M5 | Eval, Docker, CI | Answer eval (approved run) in docs/EVAL.md; `docker compose up` runs everything; CI green |
-| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment |
+| # | Milestone | Done when | Status |
+|---|---|---|---|
+| M1 | Corpus & parsing | Both documents fetched with manifest; parser yields every Điều with correct numbering (tests on real samples); chunks JSONL with metadata | done |
+| M2 | Index & hybrid retrieval | pgvector + full-text index built by one command; hybrid search with RRF; golden set drafted; retrieval eval script reports Hit@5 / MRR@10 | done (vector-only won; hybrid kept as an option) |
+| M3 | Graph + generation | LangGraph flow with routing, grading and not-found path; Gemini answers with verified citations; unit tests with a fake LLM | done |
+| M4 | API + UI | FastAPI endpoints incl. SSE streaming; chat UI with citation cards and disclaimer | done (browser-tested in Edge) |
+| M5 | Eval, Docker, CI | Answer eval (approved run) in docs/EVAL.md; `docker compose up` runs everything; CI green | done (CI green on GitHub) |
+| M6 | Polish | README with architecture diagram, demo GIF, decision notes; optional reranker experiment | done except the demo GIF (screenshots instead) and the reranker experiment |
