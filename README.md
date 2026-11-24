@@ -22,7 +22,7 @@ Requires Python 3.10+ and Docker (for PostgreSQL + pgvector).
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only PyTorch first
+pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only PyTorch first
 pip install -e ".[dev]"            # app + tests
 pip install -e ".[ingest]"         # only to re-extract text from the PDFs (PyMuPDF, AGPL)
 
@@ -41,7 +41,7 @@ ruff check . && ruff format --check .
 ```
 
 - `parse` works without the PDFs or PyMuPDF: it then reuses the committed `data/interim/*.lines.jsonl`. It downloads the bge-m3 tokenizer file once (to count chunk tokens exactly).
-- `index` downloads bge-m3 once (about 2.3 GB; on Windows without symlink support the Hugging Face cache keeps two weight files, about 4.5 GB). Embedding 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/`, so re-indexing is fast.
+- `index` downloads bge-m3 once (about 2.3 GB). The model revision is pinned (`EMBEDDING_REVISION`, the Hub's safetensors conversion of the same weights), so only one weight file is cached and offline runs work. Embedding 348 chunks takes about 8 minutes on a laptop CPU; vectors are cached in `data/cache/`, so re-indexing is fast.
 - Use `127.0.0.1` rather than `localhost` in `DATABASE_URL` on Windows: `localhost` tries IPv6 first and the container port is bound to IPv4 only, which costs a connection timeout.
 - Configuration is read from environment variables or `.env` (see `.env.example`).
 

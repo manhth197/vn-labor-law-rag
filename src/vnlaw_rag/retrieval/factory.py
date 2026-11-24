@@ -22,8 +22,7 @@ def open_retriever(
     try:
         params = dict(
             store=store,
-            embeddings=embeddings
-            or load_embeddings(settings.embedding_model, settings.embedding_batch_size),
+            embeddings=embeddings or load_embeddings(settings),
             mode=settings.retrieval_mode,
             keyword_mode=settings.keyword_mode,
             keyword_scoring=settings.keyword_scoring,

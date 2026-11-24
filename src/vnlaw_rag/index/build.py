@@ -32,7 +32,8 @@ def load_chunks(path: Path) -> list[Chunk]:
 
 def embedding_cache_path(settings: Settings, chunks_sha256: str) -> Path:
     model = re.sub(r"[^A-Za-z0-9]+", "-", settings.embedding_model).strip("-")
-    return settings.data_dir / "cache" / f"embeddings-{model}-{chunks_sha256[:16]}.npy"
+    revision = settings.embedding_revision[:8]
+    return settings.data_dir / "cache" / f"embeddings-{model}-{revision}-{chunks_sha256[:16]}.npy"
 
 
 def build_index(settings: Settings, embeddings: Embeddings | None = None) -> dict:
@@ -46,10 +47,12 @@ def build_index(settings: Settings, embeddings: Embeddings | None = None) -> dic
         vectors, embed_seconds = _embed(settings, chunks, chunks_sha256, embeddings)
         info = {
             "embedding_model": settings.embedding_model,
+            "embedding_revision": settings.embedding_revision,
             "embedding_dim": settings.embedding_dim,
             "chunks_sha256": chunks_sha256,
             "chunks": len(chunks),
-            "embed_seconds": embed_seconds,
+            "embed_seconds": embed_seconds,  # None when vectors came from data/cache
+            "embeddings_source": "cache" if embed_seconds is None else "computed",
             "indexed_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
         }
         store.replace_chunks(chunks, vectors, info)
@@ -67,9 +70,7 @@ def _embed(
         log.info("using cached embeddings %s", cache)
         return np.load(cache), None
 
-    model = embeddings or load_embeddings(
-        settings.embedding_model, settings.embedding_batch_size, show_progress=True
-    )
+    model = embeddings or load_embeddings(settings, show_progress=True)
     started = time.perf_counter()
     vectors = np.asarray(model.embed_documents([c.text for c in chunks]), dtype=np.float32)
     seconds = round(time.perf_counter() - started, 1)

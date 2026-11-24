@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Index and retrieval
     database_url: str = "postgresql://vnlaw:vnlaw@127.0.0.1:5442/vnlaw"
     embedding_model: str = "BAAI/bge-m3"
+    # Commit of the Hub's safetensors conversion of bge-m3 (same weights as main). Pinned for
+    # reproducibility; see index/embed.py.
+    embedding_revision: str = "9a0624b896d81da7492a910ffa53731274b6cf3d"
     embedding_dim: int = 1024
     embedding_batch_size: int = 8
     # Default mode chosen from docs/EVAL.md: vector-only scored best on the draft golden set;

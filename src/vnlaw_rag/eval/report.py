@@ -60,9 +60,7 @@ def git_revision() -> str:
 
 def run_retrieval_eval(settings: Settings, golden_path: Path) -> dict:
     items = load_golden(golden_path)
-    embeddings = CachedEmbeddings(
-        load_embeddings(settings.embedding_model, settings.embedding_batch_size)
-    )
+    embeddings = CachedEmbeddings(load_embeddings(settings))
     store = PgStore.open(settings.database_url)
     try:
         index_info = store.index_info()

@@ -77,13 +77,14 @@ def index() -> None:
 @app.command()
 def search(
     question: str,
-    mode: str = typer.Option("hybrid", help="hybrid | vector | keyword"),
+    mode: str = typer.Option(None, help="vector | hybrid | keyword (default: RETRIEVAL_MODE)"),
     top_k: int = typer.Option(8, help="Number of chunks to show."),
 ) -> None:
     """Run retrieval for one question and print the ranked chunks."""
     from vnlaw_rag.retrieval.factory import open_retriever
 
-    with open_retriever(get_settings(), mode=mode) as retriever:
+    overrides = {"mode": mode} if mode else {}
+    with open_retriever(get_settings(), **overrides) as retriever:
         for r in retriever.search(question, top_k=top_k):
             title = r.row.get("article_title") or r.row.get("appendix_no")
             typer.echo(
@@ -121,9 +122,15 @@ def review_export(
     out: str = typer.Option("data/eval/review-golden.xlsx", help="Workbook to write."),
     n: int = typer.Option(25, help="Number of questions (stratified by type)."),
     seed: int = typer.Option(42, help="Sampling seed."),
+    force: bool = typer.Option(False, help="Overwrite an existing workbook."),
 ) -> None:
     """Write an Excel workbook for the owner to review a sample of the golden set."""
     from vnlaw_rag.config import REPO_ROOT
+
+    if (REPO_ROOT / out).exists() and not force:
+        # The owner may be filling it in: never overwrite a review by accident.
+        typer.echo(f"{out} exists (it may hold the owner's review); use --force to overwrite")
+        raise typer.Exit(1)
     from vnlaw_rag.eval.review import export_review
     from vnlaw_rag.ingest.models import Appendix, Article
 
